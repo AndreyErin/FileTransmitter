@@ -1,19 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
+
 
 
 namespace FileTransmitter
@@ -31,6 +24,12 @@ namespace FileTransmitter
         public MainWindow()
         {
             InitializeComponent();
+        }
+
+        private void Window_Loaded(object sender, RoutedEventArgs e)
+        {
+            //разрешаем перетаскивание
+            lbxMain.AllowDrop = true;
         }
 
         //подключаемся к серверу
@@ -122,9 +121,13 @@ namespace FileTransmitter
 
         }
 
+        //получаем имя файла при перетаскивание
         private void lbxMain_Drop(object sender, DragEventArgs e)
         {
-            MessageBox.Show("");
+            string[] data = (string[])e.Data.GetData(DataFormats.FileDrop);
+            MessageBox.Show(data[0]);
         }
+
+
     }
 }
