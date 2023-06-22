@@ -5,8 +5,44 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:FileTransmitter"
         mc:Ignorable="d"
-        Title="MainWindow" Height="450" Width="800">
+        Title="Передача файлов" Height="200" Width="500">
     <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="auto"/>
+            <RowDefinition Height="auto"/>
+            <RowDefinition/>
+        </Grid.RowDefinitions>
 
+        <Grid  Grid.Row="0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition/>
+                <ColumnDefinition/>
+            </Grid.ColumnDefinitions>
+
+            <Button Grid.Column="0" x:Name="btnConnect" Content="Подключиться к серверу" Click="btnConnect_Click"/>
+            <Button Grid.Column="1" x:Name="btnStartServer" Content="Запустить сервер" Click="btnStartServer_Click" />
+        </Grid>
+
+        <Grid  Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition/>
+                <ColumnDefinition/>
+                <ColumnDefinition/>
+                <ColumnDefinition/>
+                <ColumnDefinition/>
+                
+            </Grid.ColumnDefinitions>
+            
+            <Label Grid.Column="0" Content="Адрес сервера"/>
+            <Label Grid.Column="1" Content="192.168.0.34"/>
+            <Button Grid.Column="2" Content="Изменить"/>
+            
+            <Label Grid.Column="3" Content="Адрес сервера"/>
+            <Label Grid.Column="4" Content="192.168.0.34"/>
+            
+        </Grid>
+
+
+        <ListBox x:Name="lbxMain" Grid.Row="2" Background="Ivory" Drop="lbxMain_Drop"/>
     </Grid>
 </Window>
