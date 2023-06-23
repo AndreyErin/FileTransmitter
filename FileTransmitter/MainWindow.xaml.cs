@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -16,7 +17,7 @@ namespace FileTransmitter
     /// </summary>
     public partial class MainWindow : Window
     {
-        private Socket _socketThisClient;
+        private Socket _socket;
         private Socket _socketServerListener;
         private bool _serverOn;
         private DirectoryInfo _directory;
@@ -35,18 +36,22 @@ namespace FileTransmitter
         //подключаемся к серверу
         private async void btnConnect_Click(object sender, RoutedEventArgs e)
         {
-            _socketThisClient = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-            await _socketThisClient.ConnectAsync("192.168.0.34", 7070);
+            //выключаем кнопку сервера
+            btnStartServer.Visibility = Visibility.Hidden;
 
-            byte[] data = Encoding.UTF8.GetBytes("имяФайл.txt@Запись в файле.^");
+            _socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+            await _socket.ConnectAsync("192.168.0.34", 7070);
 
-            await _socketThisClient.SendAsync(data, SocketFlags.None);
-            
+            //запускаем прием данных
+            Task.Factory.StartNew(() => GetData());
         }
 
         //запускаем сервер
         private void btnStartServer_Click(object sender, RoutedEventArgs e)
         {
+            //выключаем кнопку клиента
+            btnConnect.Visibility = Visibility.Hidden; 
+
             StartServerMode();            
         }
 
@@ -59,73 +64,86 @@ namespace FileTransmitter
 
             _socketServerListener.Listen();
 
-            while (true) 
-            {
-                var clientConnect = await _socketServerListener.AcceptAsync();
-
-                Task.Factory.StartNew(()=> ServerModeGetData(clientConnect));
-            }
+            //запускаем прием данных
+            _socket = await _socketServerListener.AcceptAsync();
+            Task.Factory.StartNew(()=> GetData());            
         } 
 
-        private async Task ServerModeGetData(Socket clientSocket) 
+        //получение данных
+        private async Task GetData() 
         {
-            List<byte> data = new List<byte>();
+            List<byte> fileNameBytes = new List<byte>();
+            byte[] fileBody;
             byte[] oneChar = new byte[1];
             int countBytes = 0;
             string fileName = "";
-            string[] nameAndBody;
-            string fileBody = "";
+            int fileLength;
+            string[] fileInfo;
+            string strBuff;
 
             while (true) 
             {
+                //считываем имя файла
                 while (true) 
                 {
-                    countBytes = await clientSocket.ReceiveAsync(oneChar, SocketFlags.None);
-                    if (countBytes == 0 || oneChar[0] == Convert.ToByte('^'))
+                    countBytes = await _socket.ReceiveAsync(oneChar, SocketFlags.None);
+                    if (countBytes == 0 || oneChar[0] == '^')
                         break;
                     //заполняем буфер
-                    data.Add(oneChar[0]);
+                    fileNameBytes.Add(oneChar[0]);
                 }
-                 var formatString = Encoding.UTF8.GetString(data.ToArray());
 
-                nameAndBody = formatString.Split('@');  
+                //переводим название файла в строковый формат
+                strBuff = Encoding.UTF8.GetString(fileNameBytes.ToArray());
 
-                fileName = nameAndBody[0];
-                fileBody = nameAndBody[1];
+                fileInfo = strBuff.Split('@');
 
-                File.WriteAllText(fileName, fileBody);
-
+                fileName = fileInfo[0];
+                fileLength = int.Parse(fileInfo[1]);
+               
+                fileBody = new byte[fileLength];
+                //считываем содержимое файла
+                countBytes = await _socket.ReceiveAsync(fileBody, SocketFlags.None);
 
                 MessageBox.Show($"файл |{fileName}| получен");
 
-
-                //очищаем буфер
-                data.Clear();
+                try
+                {
+                    //записываем файл на диск 
+                    File.WriteAllBytes(fileName, fileBody);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show("запись файла на диск\n" + ex);
+                }
+                
+                //очищаем буферы
+                fileNameBytes.Clear();                
             }
-
-
         }
 
-        private async Task ServerModeSetData() 
+        //отправка данных
+        private async Task SetData(string fileFullName) 
         {
+            string fileName = Path.GetFileName(fileFullName);            
+            byte[] bodyFile = File.ReadAllBytes(fileFullName);           
+            byte[] dataCanption = Encoding.UTF8.GetBytes($"{fileName}@{bodyFile.Length}^") ;
 
-        }
-
-        private async Task ClientModeGetData()
-        {
-
-        }
-
-        private async Task ClientModeSetData()
-        {
-
+            //отправляем имя файла и его длинну
+            await _socket.SendAsync(dataCanption.ToArray(), SocketFlags.None);
+            //отправляем сам файл
+            await _socket.SendAsync(bodyFile.ToArray(), SocketFlags.None);
         }
 
         //получаем имя файла при перетаскивание
         private void lbxMain_Drop(object sender, DragEventArgs e)
         {
-            string[] data = (string[])e.Data.GetData(DataFormats.FileDrop);
-            MessageBox.Show(data[0]);
+            string[] fileFullName = (string[])e.Data.GetData(DataFormats.FileDrop);
+
+            foreach (string fileName in fileFullName)
+            {
+                SetData(fileName);
+            }
         }
 
 
