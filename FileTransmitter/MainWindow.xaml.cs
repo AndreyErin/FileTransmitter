@@ -81,6 +81,8 @@ namespace FileTransmitter
             string[] fileInfo;
             string strBuff;
 
+            
+
             while (true) 
             {
                 //считываем имя файла
@@ -105,12 +107,36 @@ namespace FileTransmitter
                 //считываем содержимое файла
                 countBytes = await _socket.ReceiveAsync(fileBody, SocketFlags.None);
 
-                MessageBox.Show($"файл |{fileName}| получен");
+                //MessageBox.Show($"файл |{fileName}| получен");
 
                 try
                 {
-                    //записываем файл на диск 
-                    File.WriteAllBytes(fileName, fileBody);
+                    //если файл не находится во вложенной папке то просто записываем его
+                    string isHavePath = Path.GetFileName(fileName);
+                    if (isHavePath == fileName)
+                    {
+                        //записываем файл на диск 
+                        File.WriteAllBytes(fileName, fileBody);
+                    }
+                    //если файл находится во вложенной папке
+                    else
+                    {
+                        string directoryName = Path.GetDirectoryName(fileName);
+                        //если папка существует то записываем файл
+                        if (Directory.Exists(directoryName))
+                        {
+                            //записываем файл на диск 
+                            File.WriteAllBytes(fileName, fileBody);
+                        }
+                        //если папки нет, то создаем ее изаписываем файл
+                        else 
+                        {
+                            Directory.CreateDirectory(directoryName);
+                            //записываем файл на диск 
+                            File.WriteAllBytes(fileName, fileBody);
+                        }
+                        //MessageBox.Show(directoryName);
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -118,11 +144,12 @@ namespace FileTransmitter
                 }
                 
                 //очищаем буферы
-                fileNameBytes.Clear();                
+                fileNameBytes.Clear();
+                
             }
         }
 
-        //отправка данных
+        //отправка данных(файл)
         private async Task SetData(string fileFullName) 
         {
             string fileName = Path.GetFileName(fileFullName);            
@@ -135,6 +162,23 @@ namespace FileTransmitter
             await _socket.SendAsync(bodyFile.ToArray(), SocketFlags.None);
         }
 
+        int countTest = 0;
+        //отправка данных(папки)
+        private async Task SetData(string fileFullName, string perentDir)
+        {
+            string fileName = fileFullName.Remove(0, perentDir.Length +1);
+
+            byte[] bodyFile = File.ReadAllBytes(fileFullName);
+            byte[] dataCanption = Encoding.UTF8.GetBytes($"{fileName}@{bodyFile.Length}^");
+
+            //отправляем имя файла и его длинну
+            await _socket.SendAsync(dataCanption.ToArray(), SocketFlags.None);
+            //отправляем сам файл
+            await _socket.SendAsync(bodyFile.ToArray(), SocketFlags.None);
+
+            MessageBox.Show((++countTest).ToString());
+        }
+
         //получаем имя файла при перетаскивание
         private void lbxMain_Drop(object sender, DragEventArgs e)
         {
@@ -142,10 +186,26 @@ namespace FileTransmitter
 
             foreach (string fileName in fileFullName)
             {
-                SetData(fileName);
+                //если это файл то передаем его для отправки по сети
+                if (Path.GetExtension(fileName) != "")
+                {
+                    SetData(fileName);
+                }
+                //если это папка
+                else
+                {
+                    string[] filesInDir = Directory.GetFiles(fileName, "", SearchOption.AllDirectories);
+
+                    MessageBox.Show(filesInDir.Length.ToString());
+
+                    string perentDir = Directory.GetParent(fileName).FullName;
+
+                    foreach (string file in filesInDir)
+                    {
+                        SetData(file, perentDir);
+                    }
+                }
             }
         }
-
-
     }
 }
