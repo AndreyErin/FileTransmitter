@@ -102,7 +102,48 @@ namespace FileTransmitter
 
                     fileName = fileInfo[0];
                     fileLength = int.Parse(fileInfo[1]);
-               
+
+
+                    //------------------------------------------------------------------------
+                    //если файл или папка пустые
+                    if (fileLength == 0) 
+                    {
+                        countBytes = await _socket.ReceiveAsync(oneChar, SocketFlags.None);
+                        string isFile = Encoding.UTF8.GetString(oneChar.ToArray());
+
+                        switch (isFile)
+                        {
+                            case "1":
+
+                                string directoryName = Path.GetDirectoryName(fileName);
+                                //если папка существует то записываем файл
+                                if (Directory.Exists(@"Download\" + directoryName))
+                                {
+                                    //записываем файл на диск 
+                                    using (File.Create(@"Download\" + fileName)) ;                              
+                                }
+                                //если папки нет, то создаем ее изаписываем файл
+                                else
+                                {
+                                    Directory.CreateDirectory(@"Download\" + directoryName);
+                                    //записываем файл на диск 
+                                    using (File.Create(@"Download\" + fileName)) ;
+                                }
+                                break;
+
+                            case "0":
+                                Directory.CreateDirectory(@"Download\" + fileName);
+                                break;
+                        }
+
+                        return;
+                    }
+                    //------------------------------------------------------------------------
+
+
+
+
+
                     fileBody = new byte[fileLength];
 
                     //считываем содержимое файла
@@ -188,6 +229,35 @@ namespace FileTransmitter
             }            
         }
 
+        //отправка данных(пустой файл(папка))
+        private async Task SetData(string FullName, bool isFile)
+        {
+            byte[] data;
+            string fileName = Path.GetFileName(FullName);
+
+            try
+            {
+                switch (isFile)
+                {
+                    //это файл
+                    case true:
+                        data = Encoding.UTF8.GetBytes($"{fileName}|0*1");
+                        break;
+                    //это папка
+                    case false:
+                        data = Encoding.UTF8.GetBytes($"{fileName}|0*0");
+                        break;
+                }
+              
+                //отправляем паккет
+                await _socket.SendAsync(data, SocketFlags.None);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("отправка данных - папки\n" + ex.Message);
+            }
+        }
+
         //получаем имя файла при перетаскивание
         private async void lbxMain_Drop(object sender, DragEventArgs e)
         {
@@ -198,15 +268,24 @@ namespace FileTransmitter
                 foreach (string fileName in fileFullName)
                 {
                     //если это файл то передаем его для отправки по сети
-                    if (Path.GetExtension(fileName) != "")
+                    if (File.Exists(fileName))
                     {
                         if (fileName.Contains('|') || fileName.Contains('*'))
                         {
                             MessageBox.Show("Имя файла {0} содержит некорректные символы (| или *)\nКопирование не возможно. Файл будет пропущен.", fileName);
                             return;
                         }
+                        
 
-                        await SetData(fileName);
+                         FileInfo fileInfo = new FileInfo(fileName);
+
+                            //файл пустой или нет
+                            if (fileInfo.Length == 0)
+                                await SetData(fileName, true);
+                            else
+                                await SetData(fileName);
+
+                           
                     }
                     //если это папка
                     else
@@ -214,11 +293,20 @@ namespace FileTransmitter
 
                         if (fileName.Contains('|') || fileName.Contains('*'))
                         {
-                            MessageBox.Show("Имя папки {0} содержит некорректные символы (| или *)\nКопирование не возможно. Папка будет пропущена.", fileName);
+                            MessageBox.Show("Имя папки/файла {0} содержит некорректные символы (| или *)\nКопирование не возможно. Папка/файл будет пропущен(а).", fileName);
                             return;
-                        }
+                        }                      
 
                         string[] filesInDir = Directory.GetFiles(fileName, "", SearchOption.AllDirectories);
+                        string[] DirsInDir = Directory.GetDirectories(fileName);
+                        
+
+                        //eсли папка пустая
+                        if (filesInDir.Length == 0 && DirsInDir.Length == 0)
+                        {
+                            await SetData(fileName, false);
+                            return;
+                        }
 
                         //MessageBox.Show(filesInDir.Length.ToString());
 
@@ -232,7 +320,13 @@ namespace FileTransmitter
                                 return;
                             }
 
-                            await SetData(file, perentDir);
+                            FileInfo fileInfo = new FileInfo(file);
+
+                            //файл пустой или нет
+                            if (fileInfo.Length == 0)
+                                await SetData(file, true);
+                            else
+                                await SetData(file, perentDir);
                         }
                     }
                 }
