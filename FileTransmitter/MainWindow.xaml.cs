@@ -58,15 +58,23 @@ namespace FileTransmitter
         //запускаем прослушивание потрта
         private async Task StartServerMode() 
         {
-            _socketServerListener = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-            IPEndPoint iPEndPoint = new IPEndPoint(IPAddress.Any, 7070);
-            _socketServerListener.Bind(iPEndPoint);
+            try
+            {
+                _socketServerListener = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+                IPEndPoint iPEndPoint = new IPEndPoint(IPAddress.Any, 7070);
+                _socketServerListener.Bind(iPEndPoint);
 
-            _socketServerListener.Listen();
+                _socketServerListener.Listen();
 
-            //запускаем прием данных
-            _socket = await _socketServerListener.AcceptAsync();
-            Task.Factory.StartNew(()=> GetData());            
+                //запускаем прием данных
+                _socket = await _socketServerListener.AcceptAsync();
+                Task.Factory.StartNew(() => GetData());
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message);
+            }
+
         } 
 
         //получение данных
@@ -81,20 +89,22 @@ namespace FileTransmitter
             string[] fileInfo;
             string strBuff = "";
 
-            while (true) 
+            try
             {
-                //считываем имя файла
-                while (true) 
-                {
-                    countBytes = await _socket.ReceiveAsync(oneChar, SocketFlags.None);
-                    if (countBytes == 0 || oneChar[0] == '*')
-                        break;
-                    //заполняем буфер
-                    fileNameBytes.Add(oneChar[0]);
-                }
 
-                try
+                while (true)
                 {
+                    //считываем имя файла
+                    while (true)
+                    {
+                        countBytes = await _socket.ReceiveAsync(oneChar, SocketFlags.None);
+                        if (countBytes == 0 || oneChar[0] == '*')
+                            break;
+                        //заполняем буфер
+                        fileNameBytes.Add(oneChar[0]);
+                    }
+
+
                     //переводим название файла в строковый формат
                     strBuff = Encoding.UTF8.GetString(fileNameBytes.ToArray());
 
@@ -104,9 +114,9 @@ namespace FileTransmitter
                     fileLength = int.Parse(fileInfo[1]);
 
 
-                    //------------------------------------------------------------------------
+                    
                     //если файл или папка пустые
-                    if (fileLength == 0) 
+                    if (fileLength == 0)
                     {
                         countBytes = await _socket.ReceiveAsync(oneChar, SocketFlags.None);
                         string isFile = Encoding.UTF8.GetString(oneChar.ToArray());
@@ -120,7 +130,7 @@ namespace FileTransmitter
                                 if (Directory.Exists(@"Download\" + directoryName))
                                 {
                                     //записываем файл на диск 
-                                    using (File.Create(@"Download\" + fileName)) ;                              
+                                    using (File.Create(@"Download\" + fileName)) ;
                                 }
                                 //если папки нет, то создаем ее изаписываем файл
                                 else
@@ -135,54 +145,52 @@ namespace FileTransmitter
                                 Directory.CreateDirectory(@"Download\" + fileName);
                                 break;
                         }
-
-                        return;
-                    }
-                    //------------------------------------------------------------------------
-
-
-
-
-
-                    fileBody = new byte[fileLength];
-
-                    //считываем содержимое файла
-                    countBytes = await _socket.ReceiveAsync(fileBody, SocketFlags.None);
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show($"{strBuff}\n " + ex);
-                }
-                          
-                //если файл не находится во вложенной папке то просто записываем его
-                string isHavePath = Path.GetFileName(fileName);
-                if (isHavePath == fileName)
-                {
-                    //записываем файл на диск 
-                    File.WriteAllBytes(@"Download\" + fileName, fileBody);
-                }
-                //если файл находится во вложенной папке
-                else
-                {
-                    string directoryName = Path.GetDirectoryName(fileName);
-                    //если папка существует то записываем файл
-                    if (Directory.Exists(@"Download\" + directoryName))
+                    }                
+                    else
                     {
-                        //записываем файл на диск 
-                        File.WriteAllBytes(@"Download\" + fileName, fileBody);
-                    }
-                    //если папки нет, то создаем ее изаписываем файл
-                    else 
-                    {
-                        Directory.CreateDirectory(@"Download\" + directoryName);
-                        //записываем файл на диск 
-                        File.WriteAllBytes(@"Download\" + fileName, fileBody);
-                    }                    
-                }
-                //очищаем буферы
-                fileNameBytes.Clear();
-            }               
 
+
+                        fileBody = new byte[fileLength];
+
+                        //считываем содержимое файла
+                        countBytes = await _socket.ReceiveAsync(fileBody, SocketFlags.None);
+
+
+
+                        //если файл не находится во вложенной папке то просто записываем его
+                        string isHavePath = Path.GetFileName(fileName);
+                        if (isHavePath == fileName)
+                        {
+                            //записываем файл на диск 
+                            File.WriteAllBytes(@"Download\" + fileName, fileBody);
+                        }
+                        //если файл находится во вложенной папке
+                        else
+                        {
+                            string directoryName = Path.GetDirectoryName(fileName);
+                            //если папка существует то записываем файл
+                            if (Directory.Exists(@"Download\" + directoryName))
+                            {
+                                //записываем файл на диск 
+                                File.WriteAllBytes(@"Download\" + fileName, fileBody);
+                            }
+                            //если папки нет, то создаем ее изаписываем файл
+                            else
+                            {
+                                Directory.CreateDirectory(@"Download\" + directoryName);
+                                //записываем файл на диск 
+                                File.WriteAllBytes(@"Download\" + fileName, fileBody);
+                            }
+                        }
+                    }
+                    //очищаем буферы
+                    fileNameBytes.Clear();
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message);
+            }
         }
 
         //отправка данных(файл)
@@ -270,13 +278,6 @@ namespace FileTransmitter
                     //если это файл то передаем его для отправки по сети
                     if (File.Exists(fileName))
                     {
-                        if (fileName.Contains('|') || fileName.Contains('*'))
-                        {
-                            MessageBox.Show("Имя файла {0} содержит некорректные символы (| или *)\nКопирование не возможно. Файл будет пропущен.", fileName);
-                            return;
-                        }
-                        
-
                          FileInfo fileInfo = new FileInfo(fileName);
 
                             //файл пустой или нет
@@ -284,8 +285,7 @@ namespace FileTransmitter
                                 await SetData(fileName, true);
                             else
                                 await SetData(fileName);
-
-                           
+                          
                     }
                     //если это папка
                     else
@@ -299,34 +299,53 @@ namespace FileTransmitter
 
                         string[] filesInDir = Directory.GetFiles(fileName, "", SearchOption.AllDirectories);
                         string[] DirsInDir = Directory.GetDirectories(fileName);
-                        
+
 
                         //eсли папка пустая
                         if (filesInDir.Length == 0 && DirsInDir.Length == 0)
                         {
-                            await SetData(fileName, false);
-                            return;
+                            await SetData(fileName, false);                            
                         }
-
-                        //MessageBox.Show(filesInDir.Length.ToString());
-
-                        string perentDir = Directory.GetParent(fileName).FullName;
-
-                        foreach (string file in filesInDir)
+                        else
                         {
-                            if (file.Contains('|') || file.Contains('*'))
+                            //MessageBox.Show(filesInDir.Length.ToString());
+
+                            string perentDir = Directory.GetParent(fileName).FullName;
+
+                            foreach (string file in filesInDir)
                             {
-                                MessageBox.Show("Имя файла {0} содержит некорректные символы (| или *)\nКопирование не возможно. Файл будет пропущен.", fileName);
-                                return;
+                                if (file.Contains('|') || file.Contains('*'))
+                                {
+                                    MessageBox.Show("Имя файла {0} содержит некорректные символы (| или *)\nКопирование не возможно. Файл будет пропущен.", fileName);
+                                    return;
+                                }
+
+                                FileInfo fileInfo = new FileInfo(file);
+
+                                //файл пустой или нет
+                                if (fileInfo.Length == 0)
+                                    await SetData(file, true);
+                                else
+                                    await SetData(file, perentDir);
                             }
 
-                            FileInfo fileInfo = new FileInfo(file);
+                            foreach (string dir in DirsInDir)
+                            {
+                                if (dir.Contains('|') || dir.Contains('*'))
+                                {
+                                    MessageBox.Show("Имя файла {0} содержит некорректные символы (| или *)\nКопирование не возможно. Файл будет пропущен.", fileName);
+                                    return;
+                                }
 
-                            //файл пустой или нет
-                            if (fileInfo.Length == 0)
-                                await SetData(file, true);
-                            else
-                                await SetData(file, perentDir);
+                                filesInDir = Directory.GetFiles(dir, "", SearchOption.AllDirectories);
+                                DirsInDir = Directory.GetDirectories(dir);
+
+                                //eсли папка пустая
+                                if (filesInDir.Length == 0 && DirsInDir.Length == 0)
+                                {
+                                    await SetData(dir, false);
+                                }
+                            }
                         }
                     }
                 }
