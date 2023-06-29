@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
+using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
@@ -80,18 +81,17 @@ namespace FileTransmitter
         //получение данных
         private async Task GetData() 
         {
-            List<byte> fileNameBytes = new List<byte>();
+            List<byte> data = new List<byte>();
             byte[]? fileBody = null;
             byte[] oneChar = new byte[1];
             int countBytes = 0;
             string fileName = "";
             int fileLength;
-            string[] fileInfo;
+            string[] dataInfo;
             string strBuff = "";
 
             try
             {
-
                 while (true)
                 {
                     //считываем имя файла
@@ -101,90 +101,53 @@ namespace FileTransmitter
                         if (countBytes == 0 || oneChar[0] == '*')
                             break;
                         //заполняем буфер
-                        fileNameBytes.Add(oneChar[0]);
+                        data.Add(oneChar[0]);
                     }
-
 
                     //переводим название файла в строковый формат
-                    strBuff = Encoding.UTF8.GetString(fileNameBytes.ToArray());
+                    strBuff = Encoding.UTF8.GetString(data.ToArray());
 
-                    fileInfo = strBuff.Split('|');
+                    dataInfo = strBuff.Split('|');
 
-                    fileName = fileInfo[0];
-                    fileLength = int.Parse(fileInfo[1]);
-
-
-                    
-                    //если файл или папка пустые
-                    if (fileLength == 0)
+                    switch (dataInfo[0])
                     {
-                        countBytes = await _socket.ReceiveAsync(oneChar, SocketFlags.None);
-                        string isFile = Encoding.UTF8.GetString(oneChar.ToArray());
-
-                        switch (isFile)
-                        {
-                            case "1":
-
-                                string directoryName = Path.GetDirectoryName(fileName);
-                                //если папка существует то записываем файл
-                                if (Directory.Exists(@"Download\" + directoryName))
-                                {
-                                    //записываем файл на диск 
-                                    using (File.Create(@"Download\" + fileName)) ;
-                                }
-                                //если папки нет, то создаем ее изаписываем файл
-                                else
-                                {
-                                    Directory.CreateDirectory(@"Download\" + directoryName);
-                                    //записываем файл на диск 
-                                    using (File.Create(@"Download\" + fileName)) ;
-                                }
-                                break;
-
-                            case "0":
-                                Directory.CreateDirectory(@"Download\" + fileName);
-                                break;
-                        }
-                    }                
-                    else
-                    {
-
-
-                        fileBody = new byte[fileLength];
-
-                        //считываем содержимое файла
-                        countBytes = await _socket.ReceiveAsync(fileBody, SocketFlags.None);
-
-
-
-                        //если файл не находится во вложенной папке то просто записываем его
-                        string isHavePath = Path.GetFileName(fileName);
-                        if (isHavePath == fileName)
-                        {
-                            //записываем файл на диск 
-                            File.WriteAllBytes(@"Download\" + fileName, fileBody);
-                        }
-                        //если файл находится во вложенной папке
-                        else
-                        {
-                            string directoryName = Path.GetDirectoryName(fileName);
-                            //если папка существует то записываем файл
-                            if (Directory.Exists(@"Download\" + directoryName))
+                        case "DIRS":
+                            //создаем все папки
+                            for (int i = 1; i < dataInfo.Length; i++)
                             {
-                                //записываем файл на диск 
-                                File.WriteAllBytes(@"Download\" + fileName, fileBody);
+                                Directory.CreateDirectory(@"Download\" + dataInfo[i]) ;
                             }
-                            //если папки нет, то создаем ее изаписываем файл
-                            else
+                            break;
+
+
+                        default:
+                            fileName = dataInfo[0];
+                            fileLength = int.Parse(dataInfo[1]);
+
+                            //если файл пустой
+                            if (fileLength == 0) 
                             {
-                                Directory.CreateDirectory(@"Download\" + directoryName);
-                                //записываем файл на диск 
-                                File.WriteAllBytes(@"Download\" + fileName, fileBody);
+                                //создаем файл на диске
+                                using FileStream fs = File.Create(@"Download\" + fileName);
                             }
-                        }
+                            //если файл содержит данные, то считываем их
+                            else 
+                            {
+                                fileBody = new byte[fileLength];
+
+                                //считываем содержимое файла
+                                countBytes = await _socket.ReceiveAsync(fileBody, SocketFlags.None);
+
+                                //записываем файл на диск 
+
+                                File.WriteAllBytes(@"Download\" + fileName, fileBody) ;
+                            }
+
+                            break;
                     }
+
                     //очищаем буферы
-                    fileNameBytes.Clear();
+                    data.Clear();
                 }
             }
             catch (Exception ex)
@@ -197,7 +160,7 @@ namespace FileTransmitter
         private async Task SetDataFiles(List<string> filesFullName, string parentDir) 
         {
             byte[] data;
-
+            FileInfo fileInfo;
             try
             {
                 foreach (string fileName in filesFullName) 
@@ -211,7 +174,7 @@ namespace FileTransmitter
                     }
                     else
                     {
-                        FileInfo fileInfo = new FileInfo(fileName);
+                        fileInfo = new FileInfo(fileName);
 
                         //если файл пустой
                         if (fileInfo.Length == 0)
@@ -225,12 +188,13 @@ namespace FileTransmitter
 
                             //объединяем все в один пакет
                             data = dataCaption.Concat(bodyFile).ToArray();
-                        }
+                        }                       
 
                         //отправляем пакет
                         await _socket.SendAsync(data, SocketFlags.None);
                     }
                 }
+                fileInfo = null;
             }
             catch (Exception ex)
             {
@@ -297,7 +261,7 @@ namespace FileTransmitter
                         allDirectories.Add(drop);
                        
                         //проверяем содержит ли эта папка еще и вложенные папки
-                        string[] localDirectories = Directory.GetDirectories(drop);
+                        string[] localDirectories = Directory.GetDirectories(drop, "", SearchOption.AllDirectories);
                         foreach (string dir in localDirectories) 
                         {
                             //если содержит то и их добавляем
@@ -318,7 +282,7 @@ namespace FileTransmitter
                 //ждем, чтобы структура папок ушла по сети раньше файлов
                 await SetDataDir(allDirectories, parentDir.FullName);
                 
-                SetDataFiles(allFiles, parentDir.FullName);                              
+                await SetDataFiles(allFiles, parentDir.FullName);                              
             }
             catch (Exception ex)
             {
