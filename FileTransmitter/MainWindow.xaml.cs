@@ -82,7 +82,7 @@ namespace FileTransmitter
         private async Task GetData() 
         {
             List<byte> data = new List<byte>();
-            byte[]? fileBody = null;
+            byte[] fileBody;
             byte[] oneChar = new byte[1];
             int countBytes = 0;
             string fileName = "";
@@ -115,6 +115,7 @@ namespace FileTransmitter
                             //создаем все папки
                             for (int i = 1; i < dataInfo.Length; i++)
                             {
+
                                 Directory.CreateDirectory(@"Download\" + dataInfo[i]) ;
                             }
                             break;
@@ -157,44 +158,41 @@ namespace FileTransmitter
         }
 
         //отправка данных(файл)
-        private async Task SetDataFiles(List<string> filesFullName, string parentDir) 
+        private async Task SetDataFiles(List<PathNames> filesFullName) 
         {
             byte[] data;
             FileInfo fileInfo;
             try
             {
-                foreach (string fileName in filesFullName) 
+                foreach (PathNames fileName in filesFullName) 
                 {
-                    //обрезаем родительскую папку
-                    string fileNameShort = fileName.Remove(0, parentDir.Length);
-
-                    if (fileNameShort.Contains('|') || fileNameShort.Contains('*'))
+                    if (fileName.NameShort.Contains('|') || fileName.NameShort.Contains('*'))
                     {
-                        MessageBox.Show("Имя файла {0} содержит некорректные символы (| или *)\nКопирование не возможно. Файл будет пропущен.", fileNameShort);
+                        MessageBox.Show("Имя файла {0} содержит некорректные символы (| или *)\nКопирование не возможно. Файл будет пропущен.", fileName.NameShort);
                     }
                     else
                     {
-                        fileInfo = new FileInfo(fileName);
+                        fileInfo = new FileInfo(fileName.NameFull);
 
                         //если файл пустой
                         if (fileInfo.Length == 0)
                         {
-                            data = Encoding.UTF8.GetBytes($"{fileNameShort}|0*");
+                            data = Encoding.UTF8.GetBytes($"{fileName.NameShort}|0*");
                         }
                         else
                         {
-                            byte[] bodyFile = File.ReadAllBytes(fileName);
-                            byte[] dataCaption = Encoding.UTF8.GetBytes($"{fileNameShort}|{bodyFile.Length}*");
+                            byte[] bodyFile = File.ReadAllBytes(fileName.NameFull);
+                            byte[] dataCaption = Encoding.UTF8.GetBytes($"{fileName.NameShort}|{bodyFile.Length}*");
 
                             //объединяем все в один пакет
                             data = dataCaption.Concat(bodyFile).ToArray();
-                        }                       
+                        }
 
                         //отправляем пакет
                         await _socket.SendAsync(data, SocketFlags.None);
                     }
                 }
-                fileInfo = null;
+                //fileInfo = null;
             }
             catch (Exception ex)
             {
@@ -203,29 +201,25 @@ namespace FileTransmitter
         }
        
         //отправка данных(папки)
-        private async Task SetDataDir(List<string> DirFullName, string parentDir)
+        private async Task SetDataDir(List<PathNames> DirName)
         {
             StringBuilder allDirs = new StringBuilder();
 
             try
             {
-                foreach (string dirName in DirFullName)
+                foreach (PathNames dirName in DirName)
                 {
-                    //обрезаем родительскую папку
-                    string dirNameShort = dirName.Remove(0, parentDir.Length);
-
-                    if (dirNameShort.Contains('|') || dirNameShort.Contains('*'))
+                    if (dirName.NameShort.Contains('|') || dirName.NameShort.Contains('*'))
                     {
-                        MessageBox.Show("Имя папки {0} содержит некорректные символы (| или *)\nКопирование не возможно. Папка будет пропущена.", dirNameShort);
+                        MessageBox.Show("Имя папки {0} содержит некорректные символы (| или *)\nКопирование не возможно. Папка будет пропущена.", dirName.NameShort);
                     }
                     else
                     {
-                        allDirs.Append('|' + dirNameShort);
+                        allDirs.Append('|' + dirName.NameShort);
                     }
                 }
 
                 byte[] data = Encoding.UTF8.GetBytes($"DIRS{allDirs}*");
-
                 //отправляем пакет
                 await _socket.SendAsync(data, SocketFlags.None);
             }
@@ -238,56 +232,78 @@ namespace FileTransmitter
         //получаем имя файла при перетаскивание
         private async void lbxMain_Drop(object sender, DragEventArgs e)
         {           
-            List<string> allDirectories = new List<string>();
-            List<string> allFiles = new List<string>();
-
-            //список того, что перетащил пользователь
-            string[] dropData = (string[])e.Data.GetData(DataFormats.FileDrop);
-            //определяем папку из которой он ето перетащил
-            DirectoryInfo? parentDir = Directory.GetParent(dropData[0]); ;
+            List<PathNames> allDirectories = new List<PathNames>();
+            List<PathNames> allFiles = new List<PathNames>();
+            DirectoryInfo parentDir;
+            DirectoryInfo grantParentDir;
+            int fixPath = 0;
+            string nameShort = "";
 
             try
-            {              
+            {
+                //список того, что перетащил пользователь
+                string[] dropData = (string[])e.Data.GetData(DataFormats.FileDrop);
+               
                 foreach(string drop in dropData) 
                 {
+
+                    //определяем папку из которой он ето перетащил
+                    parentDir = Directory.GetParent(drop);
+                    grantParentDir = Directory.GetParent(parentDir.FullName);
+
+                    //количество символов, которые будем обрезать(+1 чтобы убрать /)
+                    fixPath = grantParentDir.FullName.Length + parentDir.Name.Length + 2;
+
                     //если это файл
                     if (File.Exists(drop))
                     {
-                        allFiles.Add(drop);                       
+                        nameShort = drop.Remove(0, fixPath);
+
+                        allFiles.Add(new PathNames() { NameFull = drop, NameShort = nameShort});                       
                     }
                     else //если это папка
                     {
+                        nameShort = drop.Remove(0, fixPath);
                         //добавляем саму папку
-                        allDirectories.Add(drop);
+                        allDirectories.Add(new PathNames() { NameFull = drop, NameShort = nameShort });
                        
                         //проверяем содержит ли эта папка еще и вложенные папки
                         string[] localDirectories = Directory.GetDirectories(drop, "", SearchOption.AllDirectories);
                         foreach (string dir in localDirectories) 
                         {
+                            nameShort = dir.Remove(0, fixPath);
                             //если содержит то и их добавляем
-                            allDirectories.Add(dir);
+                            allDirectories.Add(new PathNames() { NameFull = dir, NameShort = nameShort });
                         }
 
                         //содержит ли папка файлы
                         string[] filesInDir = Directory.GetFiles(drop, "", SearchOption.AllDirectories);
                         foreach(string file in filesInDir) 
                         {
-                            allFiles.Add(file);
+                            nameShort = file.Remove(0, fixPath);
+                            allFiles.Add(new PathNames() { NameFull = file, NameShort = nameShort });
                         }
 
                     }
                 }
                 //на этот момент мы имеем 2 полных списка файлов и папок
+                //с их полными и относительными путями
 
                 //ждем, чтобы структура папок ушла по сети раньше файлов
-                await SetDataDir(allDirectories, parentDir.FullName);
-                
-                await SetDataFiles(allFiles, parentDir.FullName);                              
+                await SetDataDir(allDirectories);
+
+                await SetDataFiles(allFiles);
             }
             catch (Exception ex)
             {
                 MessageBox.Show("Подготовка списка файлов\n" + ex.Message);
             }
+        }
+
+        public struct PathNames 
+        {
+            public string NameShort;
+            public string NameFull;
         }
     }
 }
