@@ -23,6 +23,9 @@ namespace FileTransmitter
         private bool _serverOn;
         private int _countFilesForGet = 0;//подсчет файлов которые надо принять в принимающей программе
         private int _countFilesForSet = 0;//подсчет файлов которые надо отправить, передающей программе
+        private int _unknowData = 0;//подсчет непонятных пакетов(будут в случае сбоя при получение файла)
+
+        public PathNames fileNameStruct = new PathNames();
 
         public MainWindow()
         {
@@ -91,143 +94,173 @@ namespace FileTransmitter
             string[] dataInfo;
             string strBuff = "";
 
-            try
+
+            while (true)
             {
+                //считываем имя файла
                 while (true)
                 {
-                    //считываем имя файла
-                    while (true)
-                    {
-                        countBytes = await _socket.ReceiveAsync(oneChar, SocketFlags.None);
-                        if (countBytes == 0 || oneChar[0] == '*')
-                            break;
-                        //заполняем буфер
-                        data.Add(oneChar[0]);
-                    }
-
-                    Action action = async () =>
-                    {
-
-                        //переводим название файла в строковый формат
-                        strBuff = Encoding.UTF8.GetString(data.ToArray());
-
-                    dataInfo = strBuff.Split('|');
+                    countBytes = await _socket.ReceiveAsync(oneChar, SocketFlags.None);
+                    if (countBytes == 0 || oneChar[0] == '*')
+                        break;
+                    //заполняем буфер
+                    data.Add(oneChar[0]);
+                }
 
 
+                //переводим название файла в строковый формат
+                strBuff = Encoding.UTF8.GetString(data.ToArray());
 
-                    //Action action = () =>
-                    //{
-                    //    txtStat.Text += dataInfo[0] + "-----" + dataInfo[1] + '\n';
-                    //};
-                    //    Dispatcher.Invoke(action);
+                dataInfo = strBuff.Split('|');
 
+               
 
+                switch (dataInfo[0])
+                {
+                    case "DIRS":
+                        //создаем все папки
+                        for (int i = 1; i < dataInfo.Length; i++)
+                        {
+                            Directory.CreateDirectory(@"Download\" + dataInfo[i]);
+                        }
+                        break;
 
-
-                    switch (dataInfo[0])
-                    {
-                        case "DIRS":
-                            //создаем все папки
-                            for (int i = 1; i < dataInfo.Length; i++)
-                            {
-
-                                Directory.CreateDirectory(@"Download\" + dataInfo[i]) ;
-                            }
-                            break;
-
-                        case "STATISTIC":
-                            int transfer = int.Parse(dataInfo[1]);
-                            _countFilesForGet = int.Parse(dataInfo[2]);
-
+                    case "STATISTIC":
+                        _countFilesForGet = int.Parse(dataInfo[1]);
+                        Action action = () =>
+                        {
                             //блокируем перетаскивание Drag & Drop
                             lbxMain.AllowDrop = false;
                             lbxMain.Background = Brushes.Red;
                             WinMain.Title = "Получение данных";
-                            break;
+                        };
+                        Dispatcher.Invoke(action);
+                        break;
 
-                            //это сообщение получает передающая сторона
-                        case "FILESERVISED":
-                            //если файлы для отправки еще есть
-                            if(_countFilesForSet > 0)                               
-                                await SetDataFiles();//отправляем следующий файл
-                            break;
-
-
-                        default:
-
-
-
-
-
-
-                                if (dataInfo.Length < 2)
-                                {
-                                    //MessageBox.Show(dataInfo[0].ToString());
-                                    break;
-                                }
-                                else 
-                                {
-                                    fileName = dataInfo[0];
-                                    bool canParse = int.TryParse(dataInfo[1], out int result);
-                                    if (canParse)
-                                    {
-                                        fileLength = result;
-                                    }
-                                    else 
-                                    {
-                                        break;
-                                    }
-                                }
+                    case "TRANSFEREND":
+                        Action action2 = () =>
+                        {
+                            //Разблокируем перетаскивание Drag & Drop
+                            lbxMain.AllowDrop = true;
+                            lbxMain.Background = Brushes.Ivory;
+                            WinMain.Title = $"Все данные получены. Ошибок: {_unknowData}";                            
+                        };
+                        Dispatcher.Invoke(action2);
+                        //обнуляем счетчик
+                        _countFilesForGet = 0;
+                        _unknowData = 0;
+                        break;
 
 
+                    //---------/это сообщение получает передающая сторона
+                    case "FILESERVISED":
+                        //если файлы для отправки еще есть
+                        if (_countFilesForSet > 0)
+                            await SetDataFiles();//отправляем следующий файл
+                        break;
+                    
+                    case "ERROR":
+                        //получена ошибка
+                        _unknowData++;
+                        _countFilesForSet--;
 
-                        //если файл пустой
-                        if (fileLength == 0) 
+                        //если все данные отправлены то разблокируем перетаскивание Drag & Drop
+                        if (_countFilesForSet <= 0)
+                        {
+                            Action action3 = () =>
+                            {
+                                lbxMain.AllowDrop = true;
+                                lbxMain.Background = Brushes.Ivory;
+                                WinMain.Title = $"Все данные отправлены, Ошибок: {_unknowData}";
+                            };
+                            Dispatcher.Invoke(action3);
+
+                            //обнуляем счетчик
+                            _countFilesForSet = 0;
+                            _unknowData = 0;
+                            //отправляем сообщение о том, что передача данных окончена
+                            await _socket.SendAsync(Encoding.UTF8.GetBytes("TRANSFEREND|0*"), SocketFlags.None);
+                        }
+                        break;
+                    //---------/это сообщение получает передающая сторона
+
+
+
+
+                    case "FILEZERO":
+                        fileName = dataInfo[1];
+
+                        try
                         {
                             //создаем файл на диске
                             using FileStream fs = File.Create(@"Download\" + fileName);
                         }
-                        //если файл содержит данные, то считываем их
-                        else 
+                        catch (Exception ex)
                         {
-                            fileBody = new byte[fileLength];
-
-                            //считываем содержимое файла
-                            countBytes = await _socket.ReceiveAsync(fileBody, SocketFlags.None);
-
-                            //записываем файл на диск 
-
-                            File.WriteAllBytes(@"Download\" + fileName, fileBody) ;
+                            MessageBox.Show("Ошибка записи пустого файла" + ex.Message);
                         }
+
 
                         //отправляем сообщение о том, что очередной файл принят и обработан
                         await _socket.SendAsync(Encoding.UTF8.GetBytes("FILESERVISED|0*"), SocketFlags.None);
                         _countFilesForGet--;
-
-                                //если все файлы приняты, разблокируем прием и сообщаем об этом в заголовке
-                                if (_countFilesForGet <= 0)
-                                {
-                                    //Разблокируем перетаскивание Drag & Drop
-                                    lbxMain.AllowDrop = true;
-                                    lbxMain.Background = Brushes.Ivory;
-                                    WinMain.Title = "Все данные получены";
-                                }
-
                         break;
-                    }
 
-                    //очищаем буферы
-                    data.Clear();
+                    case "FILE":
+                        fileName = dataInfo[1];
 
-                };
-                Dispatcher.Invoke(action);
+                        bool canParse = int.TryParse(dataInfo[2], out int result);
+                        if (canParse)
+                        {
+                            fileLength = result;
+                        }
+                        else
+                        {
+                            //отправляем сообщение об ошибке отправляющей программе
+                            await _socket.SendAsync(Encoding.UTF8.GetBytes("ERROR|0*"), SocketFlags.None);
+                            _countFilesForGet--;
+                            break;
+                        }
+
+
+                        fileBody = new byte[fileLength];
+
+                        //считываем содержимое файла
+                        countBytes = await _socket.ReceiveAsync(fileBody, SocketFlags.None);
+
+                        try
+                        {
+                            //записываем файл на диск 
+                            File.WriteAllBytes(@"Download\" + fileName, fileBody);
+                        }
+                        catch (Exception ex)
+                        {
+                            MessageBox.Show("Ошибка записи файла" + ex.Message);
+                        }
+
+
+                        //отправляем сообщение о том, что очередной файл принят и обработан
+                        await _socket.SendAsync(Encoding.UTF8.GetBytes("FILESERVISED|0*"), SocketFlags.None);
+                        _countFilesForGet--;
+                        break;
+                
+
+                    default:
+                        _unknowData++;// отмечаем неизвестный пакет = сбой при получение файла
+                        //отправляем сообщение об ошибке отправляющей программе
+                        await _socket.SendAsync(Encoding.UTF8.GetBytes("ERROR|0*"), SocketFlags.None);
+                        _countFilesForGet--;
+                        break;
+                }
+
+                //очищаем буферы
+                data.Clear();
+              
             }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show(ex.Message);
-            }
+
         }
+
+        
 
         //отправка данных(файл)
         private async Task SetDataFiles() 
@@ -236,27 +269,25 @@ namespace FileTransmitter
             FileInfo fileInfo;
             try
             {
-                PathNames fileName = allFiles[_countFilesForSet - 1]; //поправка на индекс
+                fileNameStruct = allFiles[_countFilesForSet - 1]; //поправка на индекс
 
-                //foreach (PathNames fileName in filesFullName) 
-                //{
-                    if (fileName.NameShort.Contains('|') || fileName.NameShort.Contains('*'))
+                    if (fileNameStruct.NameShort.Contains('|') || fileNameStruct.NameShort.Contains('*'))
                     {
-                        MessageBox.Show("Имя файла {0} содержит некорректные символы (| или *)\nКопирование не возможно. Файл будет пропущен.", fileName.NameShort);
+                        MessageBox.Show("Имя файла {0} содержит некорректные символы (| или *)\nКопирование не возможно. Файл будет пропущен.", fileNameStruct.NameShort);
                     }
                     else
                     {
-                        fileInfo = new FileInfo(fileName.NameFull);
+                        fileInfo = new FileInfo(fileNameStruct.NameFull);
 
                         //если файл пустой
                         if (fileInfo.Length == 0)
                         {
-                            data = Encoding.UTF8.GetBytes($"{fileName.NameShort}|0*");
+                            data = Encoding.UTF8.GetBytes($"FILEZERO|{fileNameStruct.NameShort}|0*");
                         }
                         else
                         {
-                            byte[] bodyFile = File.ReadAllBytes(fileName.NameFull);
-                            byte[] dataCaption = Encoding.UTF8.GetBytes($"{fileName.NameShort}|{bodyFile.Length}*");
+                            byte[] bodyFile = File.ReadAllBytes(fileNameStruct.NameFull);
+                            byte[] dataCaption = Encoding.UTF8.GetBytes($"FILE|{fileNameStruct.NameShort}|{bodyFile.Length}*");
 
                             //объединяем все в один пакет
                             data = dataCaption.Concat(bodyFile).ToArray();
@@ -265,15 +296,25 @@ namespace FileTransmitter
                         //отправляем пакет
                         await _socket.SendAsync(data, SocketFlags.None);
                     }
-                //}
+               
                 _countFilesForSet--;
 
                 //если все данные отправлены то разблокируем перетаскивание Drag & Drop
-                if (_countFilesForSet <= 0) 
+                if (_countFilesForSet <= 0)
                 {
-                    lbxMain.AllowDrop = true;
-                    lbxMain.Background = Brushes.Ivory;
-                    WinMain.Title = "Все данные отправлены";
+                    Action action = () =>
+                    {
+                        lbxMain.AllowDrop = true;
+                        lbxMain.Background = Brushes.Ivory;
+                        WinMain.Title = $"Все данные отправлены, Ошибок: {_unknowData}";
+                    };
+                    Dispatcher.Invoke(action);
+
+                    //обнуляем счетчик
+                    _countFilesForSet = 0;
+                    _unknowData = 0;
+                    //отправляем сообщение о том, что передача данных окончена
+                    await _socket.SendAsync(Encoding.UTF8.GetBytes("TRANSFEREND|0*"), SocketFlags.None);
                 }
 
             }
@@ -283,7 +324,7 @@ namespace FileTransmitter
             }
         }
        
-        //отправка данных(папки)
+        //отправка данных(папки/структуры всех папок)
         private async Task SetDataDir(List<PathNames> DirName)
         {
             StringBuilder allDirs = new StringBuilder();
@@ -313,9 +354,9 @@ namespace FileTransmitter
         }
 
         //отправка статистики
-        private async Task SetStatistic(bool transfer ,int countFiles = 0) 
+        private async Task SetStatistic(int countFiles) 
         {
-            byte[] data = Encoding.UTF8.GetBytes($"STATISTIC|{Convert.ToInt32(transfer)}|{countFiles}*");
+            byte[] data = Encoding.UTF8.GetBytes($"STATISTIC|{countFiles}|0*");
             //отправляем пакет
             await _socket.SendAsync(data, SocketFlags.None);
         }
@@ -336,8 +377,8 @@ namespace FileTransmitter
             {
                 //список того, что перетащил пользователь
                 string[] dropData = (string[])e.Data.GetData(DataFormats.FileDrop);
-               
-                foreach(string drop in dropData) 
+
+                foreach (string drop in dropData)
                 {
 
                     //определяем папку из которой он ето перетащил
@@ -352,17 +393,17 @@ namespace FileTransmitter
                     {
                         nameShort = drop.Remove(0, fixPath);
 
-                        allFiles.Add(new PathNames() { NameFull = drop, NameShort = nameShort});                       
+                        allFiles.Add(new PathNames() { NameFull = drop, NameShort = nameShort });
                     }
                     else //если это папка
                     {
                         nameShort = drop.Remove(0, fixPath);
                         //добавляем саму папку
                         allDirectories.Add(new PathNames() { NameFull = drop, NameShort = nameShort });
-                       
+
                         //проверяем содержит ли эта папка еще и вложенные папки
                         string[] localDirectories = Directory.GetDirectories(drop, "", SearchOption.AllDirectories);
-                        foreach (string dir in localDirectories) 
+                        foreach (string dir in localDirectories)
                         {
                             nameShort = dir.Remove(0, fixPath);
                             //если содержит то и их добавляем
@@ -371,7 +412,7 @@ namespace FileTransmitter
 
                         //содержит ли папка файлы
                         string[] filesInDir = Directory.GetFiles(drop, "", SearchOption.AllDirectories);
-                        foreach(string file in filesInDir) 
+                        foreach (string file in filesInDir)
                         {
                             nameShort = file.Remove(0, fixPath);
                             allFiles.Add(new PathNames() { NameFull = file, NameShort = nameShort });
@@ -383,7 +424,7 @@ namespace FileTransmitter
                 //с их полными и относительными путями
 
 
-                
+
 
                 //блокируем перетаскивание Drag & Drop
                 lbxMain.AllowDrop = false;
@@ -402,10 +443,19 @@ namespace FileTransmitter
                 {
                     _countFilesForSet = allFiles.Count;
                     //отправляем количество файлов принимающей программе
-                    await SetStatistic(true, _countFilesForSet);
+                    await SetStatistic(_countFilesForSet);
                     //отправляем первый файл, если он есть
                     await SetDataFiles();
                 }
+                else 
+                {
+                    lbxMain.AllowDrop = true;
+                    lbxMain.Background = Brushes.Ivory;
+                    WinMain.Title = $"Все данные отправлены(Были только папки)";
+                    //отправляем сообщение о том, что передача данных окончена
+                    await _socket.SendAsync(Encoding.UTF8.GetBytes("TRANSFEREND|0*"), SocketFlags.None);
+                }
+
             }
             catch (Exception ex)
             {
