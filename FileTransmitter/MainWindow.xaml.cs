@@ -23,7 +23,8 @@ namespace FileTransmitter
         private bool _serverOn;
         private int _countFilesForGet = 0;//подсчет файлов которые надо принять в принимающей программе
         private int _countFilesForSet = 0;//подсчет файлов которые надо отправить, передающей программе
-        private int _unknowData = 0;//подсчет непонятных пакетов(будут в случае сбоя при получение файла)
+        private static int _errorDataGet = 0;//подсчет непонятных пакетов(будут в случае сбоя при получение файла)
+        private static int _errorDataSet = 0;
 
         public PathNames fileNameStruct = new PathNames();
 
@@ -93,10 +94,13 @@ namespace FileTransmitter
             int fileLength;
             string[] dataInfo;
             string strBuff = "";
-
+            char[] charArray;
 
             while (true)
             {
+                //очищаем буферы
+                data.Clear();
+
                 //считываем имя файла
                 while (true)
                 {
@@ -107,10 +111,23 @@ namespace FileTransmitter
                     data.Add(oneChar[0]);
                 }
 
+                charArray = new char[data.Count];
+
 
                 //переводим название файла в строковый формат
-                strBuff = Encoding.UTF8.GetString(data.ToArray());
+                int resultToConvert = Encoding.UTF8.GetDecoder().GetChars(data.ToArray(), charArray, true);//.GetString(data.ToArray());
 
+                if (resultToConvert != data.Count)
+                {
+                    //MessageBox.Show("Чета тута аще не камильфо");
+                }
+
+                //обрезаем массив до реально считанных символов
+                Array.Resize(ref charArray, resultToConvert);
+
+                strBuff = new string(charArray);
+
+               
                 dataInfo = strBuff.Split('|');
 
                
@@ -126,6 +143,9 @@ namespace FileTransmitter
                         break;
 
                     case "STATISTIC":
+
+                        //обнуляем счетчик
+                        _errorDataGet = 0;
                         _countFilesForGet = int.Parse(dataInfo[1]);
                         Action action = () =>
                         {
@@ -143,44 +163,45 @@ namespace FileTransmitter
                             //Разблокируем перетаскивание Drag & Drop
                             lbxMain.AllowDrop = true;
                             lbxMain.Background = Brushes.Ivory;
-                            WinMain.Title = $"Все данные получены. Ошибок: {_unknowData}";                            
+                            WinMain.Title = $"Все данные получены. Ошибок: {_errorDataGet}";                            
                         };
                         Dispatcher.Invoke(action2);
-                        //обнуляем счетчик
-                        _countFilesForGet = 0;
-                        _unknowData = 0;
                         break;
 
 
                     //---------/это сообщение получает передающая сторона
                     case "FILESERVISED":
+                        //_countFilesForSet--;
+
+
                         //если файлы для отправки еще есть
                         if (_countFilesForSet > 0)
+                        {
                             await SetDataFiles();//отправляем следующий файл
+                        }                      
+                        //если все данные отправлены то разблокируем перетаскивание Drag & Drop
+                        else
+                        {
+                            Action action147 = () =>
+                            {
+                                lbxMain.AllowDrop = true;
+                                lbxMain.Background = Brushes.Ivory;
+                                WinMain.Title = $"Все данные отправлены, Ошибок: {_errorDataSet}";
+                            };
+                            Dispatcher.Invoke(action147);
+
+
+                            //отправляем сообщение о том, что передача данных окончена
+                            await _socket.SendAsync(Encoding.UTF8.GetBytes("TRANSFEREND|0|0*"), SocketFlags.None);
+                        }
+
+
                         break;
                     
                     case "ERROR":
                         //получена ошибка
-                        _unknowData++;
-                        _countFilesForSet--;
-
-                        //если все данные отправлены то разблокируем перетаскивание Drag & Drop
-                        if (_countFilesForSet <= 0)
-                        {
-                            Action action3 = () =>
-                            {
-                                lbxMain.AllowDrop = true;
-                                lbxMain.Background = Brushes.Ivory;
-                                WinMain.Title = $"Все данные отправлены, Ошибок: {_unknowData}";
-                            };
-                            Dispatcher.Invoke(action3);
-
-                            //обнуляем счетчик
-                            _countFilesForSet = 0;
-                            _unknowData = 0;
-                            //отправляем сообщение о том, что передача данных окончена
-                            await _socket.SendAsync(Encoding.UTF8.GetBytes("TRANSFEREND|0*"), SocketFlags.None);
-                        }
+                        _errorDataSet++;
+                        
                         break;
                     //---------/это сообщение получает передающая сторона
 
@@ -194,6 +215,8 @@ namespace FileTransmitter
                         {
                             //создаем файл на диске
                             using FileStream fs = File.Create(@"Download\" + fileName);
+
+                            Dispatcher.Invoke(()=> WinMain.Title = fileName);
                         }
                         catch (Exception ex)
                         {
@@ -202,8 +225,7 @@ namespace FileTransmitter
 
 
                         //отправляем сообщение о том, что очередной файл принят и обработан
-                        await _socket.SendAsync(Encoding.UTF8.GetBytes("FILESERVISED|0*"), SocketFlags.None);
-                        _countFilesForGet--;
+                        await _socket.SendAsync(Encoding.UTF8.GetBytes("FILESERVISED|0|0*"), SocketFlags.None);
                         break;
 
                     case "FILE":
@@ -217,41 +239,70 @@ namespace FileTransmitter
                         else
                         {
                             //отправляем сообщение об ошибке отправляющей программе
-                            await _socket.SendAsync(Encoding.UTF8.GetBytes("ERROR|0*"), SocketFlags.None);
-                            _countFilesForGet--;
+                            await _socket.SendAsync(Encoding.UTF8.GetBytes("ERROR|0|0*"), SocketFlags.None);
+                            //_countFilesForGet--;
+                            _errorDataGet++;
                             break;
                         }
 
+                        //---------------------------------------------------------------------------------------
 
                         fileBody = new byte[fileLength];
 
                         //считываем содержимое файла
-                        countBytes = await _socket.ReceiveAsync(fileBody, SocketFlags.None);
+                        countBytes =  await _socket.ReceiveAsync(fileBody, SocketFlags.None);
+
+                        //---------------------------------------------------------------------------------------
+                        //data.Clear();
+                        ////считываем необработанные байты
+                        //while (true)
+                        //{
+                        //    countBytes = await _socket.ReceiveAsync(oneChar, SocketFlags.None);
+                        //    if (countBytes == 0 || oneChar[0] == '*')
+                        //        break;
+                        //    //заполняем буфер
+                        //    data.Add(oneChar[0]);
+                        //}
+
+                        //int dddd = data.Count;
+
+                        //fileBody = data.ToArray();
+                        //---------------------------------------------------------------------------------------
+
 
                         try
                         {
-                            //записываем файл на диск 
-                            File.WriteAllBytes(@"Download\" + fileName, fileBody);
+                            //записываем файл на диск и ждём пока он запишется
+                            await Task.Run(()=> File.WriteAllBytes(@"Download\" + fileName, fileBody));
+                            Dispatcher.Invoke(() => WinMain.Title = fileName);
                         }
                         catch (Exception ex)
                         {
-                            MessageBox.Show("Ошибка записи файла" + ex.Message);
+                            Dispatcher.Invoke(()=> MessageBox.Show("Ошибка записи файла\n" + ex.Message));
+
+                            _errorDataGet++;
+                            await _socket.SendAsync(Encoding.UTF8.GetBytes("ERROR|0|0*"), SocketFlags.None);
                         }
 
 
                         //отправляем сообщение о том, что очередной файл принят и обработан
-                        await _socket.SendAsync(Encoding.UTF8.GetBytes("FILESERVISED|0*"), SocketFlags.None);
-                        _countFilesForGet--;
+                        await _socket.SendAsync(Encoding.UTF8.GetBytes("FILESERVISED|0|0*"), SocketFlags.None);
+
                         break;
                 
 
                     default:
-                        _unknowData++;// отмечаем неизвестный пакет = сбой при получение файла
+                        _errorDataGet++;// отмечаем неизвестный пакет = сбой при получение файла
                         //отправляем сообщение об ошибке отправляющей программе
-                        await _socket.SendAsync(Encoding.UTF8.GetBytes("ERROR|0*"), SocketFlags.None);
-                        _countFilesForGet--;
+                        await _socket.SendAsync(Encoding.UTF8.GetBytes("ERROR|0|0*"), SocketFlags.None);
+                        //_countFilesForGet--;
+
+                        
                         break;
                 }
+
+                _countFilesForGet--;
+
 
                 //очищаем буферы
                 data.Clear();
@@ -259,13 +310,13 @@ namespace FileTransmitter
             }
 
         }
-
-        
-
+       
         //отправка данных(файл)
         private async Task SetDataFiles() 
         {
             byte[] data;
+            byte[] bodyFile = new byte[1];
+            byte[] dataCaption;
             FileInfo fileInfo;
             try
             {
@@ -286,8 +337,9 @@ namespace FileTransmitter
                         }
                         else
                         {
-                            byte[] bodyFile = File.ReadAllBytes(fileNameStruct.NameFull);
-                            byte[] dataCaption = Encoding.UTF8.GetBytes($"FILE|{fileNameStruct.NameShort}|{bodyFile.Length}*");
+                            await Task.Run(()=> bodyFile = File.ReadAllBytes(fileNameStruct.NameFull));
+                        
+                            dataCaption = Encoding.UTF8.GetBytes($"FILE|{fileNameStruct.NameShort}|{bodyFile.Length}*");
 
                             //объединяем все в один пакет
                             data = dataCaption.Concat(bodyFile).ToArray();
@@ -295,27 +347,14 @@ namespace FileTransmitter
 
                         //отправляем пакет
                         await _socket.SendAsync(data, SocketFlags.None);
+
+                        Dispatcher.Invoke(()=> WinMain.Title = fileNameStruct.NameShort);
+
                     }
                
                 _countFilesForSet--;
 
-                //если все данные отправлены то разблокируем перетаскивание Drag & Drop
-                if (_countFilesForSet <= 0)
-                {
-                    Action action = () =>
-                    {
-                        lbxMain.AllowDrop = true;
-                        lbxMain.Background = Brushes.Ivory;
-                        WinMain.Title = $"Все данные отправлены, Ошибок: {_unknowData}";
-                    };
-                    Dispatcher.Invoke(action);
 
-                    //обнуляем счетчик
-                    _countFilesForSet = 0;
-                    _unknowData = 0;
-                    //отправляем сообщение о том, что передача данных окончена
-                    await _socket.SendAsync(Encoding.UTF8.GetBytes("TRANSFEREND|0*"), SocketFlags.None);
-                }
 
             }
             catch (Exception ex)
@@ -373,6 +412,11 @@ namespace FileTransmitter
            //очищаем список файлов
             allFiles.Clear();
 
+            //обнуляем счетчик
+            _countFilesForSet = 0;
+            _errorDataSet = 0;
+
+
             try
             {
                 //список того, что перетащил пользователь
@@ -385,7 +429,7 @@ namespace FileTransmitter
                     parentDir = Directory.GetParent(drop);
                     grantParentDir = Directory.GetParent(parentDir.FullName);
 
-                    //количество символов, которые будем обрезать(+1 чтобы убрать /)
+                    //количество символов, которые будем обрезать(+2 чтобы убрать /)
                     fixPath = grantParentDir.FullName.Length + parentDir.Name.Length + 2;
 
                     //если это файл
@@ -416,6 +460,8 @@ namespace FileTransmitter
                         {
                             nameShort = file.Remove(0, fixPath);
                             allFiles.Add(new PathNames() { NameFull = file, NameShort = nameShort });
+
+                            
                         }
 
                     }
@@ -453,7 +499,7 @@ namespace FileTransmitter
                     lbxMain.Background = Brushes.Ivory;
                     WinMain.Title = $"Все данные отправлены(Были только папки)";
                     //отправляем сообщение о том, что передача данных окончена
-                    await _socket.SendAsync(Encoding.UTF8.GetBytes("TRANSFEREND|0*"), SocketFlags.None);
+                    await _socket.SendAsync(Encoding.UTF8.GetBytes("TRANSFEREND|0|0*"), SocketFlags.None);
                 }
 
             }
