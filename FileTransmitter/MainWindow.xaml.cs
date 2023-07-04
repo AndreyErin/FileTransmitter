@@ -247,26 +247,14 @@ namespace FileTransmitter
 
                         //---------------------------------------------------------------------------------------
 
-                        fileBody = new byte[fileLength];
+                        fileBody = new byte[fileLength * 2];
 
                         //считываем содержимое файла
                         countBytes =  await _socket.ReceiveAsync(fileBody, SocketFlags.None);
 
-                        //---------------------------------------------------------------------------------------
-                        //data.Clear();
-                        ////считываем необработанные байты
-                        //while (true)
-                        //{
-                        //    countBytes = await _socket.ReceiveAsync(oneChar, SocketFlags.None);
-                        //    if (countBytes == 0 || oneChar[0] == '*')
-                        //        break;
-                        //    //заполняем буфер
-                        //    data.Add(oneChar[0]);
-                        //}
+                        Array.Resize(ref fileBody, countBytes);
 
-                        //int dddd = data.Count;
 
-                        //fileBody = data.ToArray();
                         //---------------------------------------------------------------------------------------
 
 
