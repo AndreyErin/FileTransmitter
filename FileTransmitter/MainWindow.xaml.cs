@@ -91,7 +91,7 @@ namespace FileTransmitter
             byte[] oneChar = new byte[1];
             int countBytes = 0;
             string fileName = "";
-            int fileLength;
+            long fileLength;
             string[] dataInfo;
             string strBuff = "";
             char[] charArray;
@@ -171,9 +171,6 @@ namespace FileTransmitter
 
                     //---------/это сообщение получает передающая сторона
                     case "FILESERVISED":
-                        //_countFilesForSet--;
-
-
                         //если файлы для отправки еще есть
                         if (_countFilesForSet > 0)
                         {
@@ -190,12 +187,9 @@ namespace FileTransmitter
                             };
                             Dispatcher.Invoke(action147);
 
-
                             //отправляем сообщение о том, что передача данных окончена
                             await _socket.SendAsync(Encoding.UTF8.GetBytes("TRANSFEREND|0|0*"), SocketFlags.None);
                         }
-
-
                         break;
                     
                     case "ERROR":
@@ -231,7 +225,7 @@ namespace FileTransmitter
                     case "FILE":
                         fileName = dataInfo[1];
 
-                        bool canParse = int.TryParse(dataInfo[2], out int result);
+                        bool canParse = long.TryParse(dataInfo[2], out long result);
                         if (canParse)
                         {
                             fileLength = result;
@@ -247,12 +241,13 @@ namespace FileTransmitter
 
                         //---------------------------------------------------------------------------------------
 
-                        fileBody = new byte[fileLength * 2];
+                        //fileBody = new byte[fileLength];
+                        
+                        
 
-                        //считываем содержимое файла
-                        countBytes =  await _socket.ReceiveAsync(fileBody, SocketFlags.None);
+                        
 
-                        Array.Resize(ref fileBody, countBytes);
+                        //Array.Resize(ref fileBody, countBytes);
 
 
                         //---------------------------------------------------------------------------------------
@@ -260,8 +255,35 @@ namespace FileTransmitter
 
                         try
                         {
+                            
+                            FileInfo fileInfo = new FileInfo(@"Download\" + fileName);
+                            BinaryWriter binaryWriter = new BinaryWriter(fileInfo.OpenWrite());
+                            
+                            //создаем буфер 2 MB
+                            fileBody = new byte[2097152];
+
+                            while (true)
+                            {                               
+                                //считываем 2 метра из потока
+                                countBytes = await _socket.ReceiveAsync(fileBody, SocketFlags.None);
+
+                                ////обрезаем все что не является нашим файлом
+                                //Array.Resize(ref fileBody, countBytes);
+
+                                //записываем считанные байты в файл
+                                binaryWriter.Write(fileBody, 0, countBytes);
+
+                                //если мы считали весь файл в поток, то выходим из цикла
+                                if (binaryWriter.BaseStream.Length == fileLength) break;
+                            }
+                            
+                            //закрываем поток записи и высвобождаем его память
+                            binaryWriter.Close();
+                            
+
+
                             //записываем файл на диск и ждём пока он запишется
-                            await Task.Run(()=> File.WriteAllBytes(@"Download\" + fileName, fileBody));
+                            //await Task.Run(()=> File.WriteAllBytes(@"Download\" + fileName, fileBody));
                             Dispatcher.Invoke(() => WinMain.Title = fileName);
                         }
                         catch (Exception ex)
@@ -327,7 +349,7 @@ namespace FileTransmitter
                         {
                             await Task.Run(()=> bodyFile = File.ReadAllBytes(fileNameStruct.NameFull));
                         
-                            dataCaption = Encoding.UTF8.GetBytes($"FILE|{fileNameStruct.NameShort}|{bodyFile.Length}*");
+                            dataCaption = Encoding.UTF8.GetBytes($"FILE|{fileNameStruct.NameShort}|{fileInfo.Length}*");
 
                             //объединяем все в один пакет
                             data = dataCaption.Concat(bodyFile).ToArray();
