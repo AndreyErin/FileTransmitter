@@ -397,7 +397,7 @@ namespace FileTransmitter
         {           
             List<PathNames> allDirectories = new List<PathNames>();           
             DirectoryInfo parentDir;
-            DirectoryInfo grantParentDir;
+            DirectoryInfo? grantParentDir = null;
             int fixPath = 0;
             string nameShort = "";
 
@@ -416,13 +416,21 @@ namespace FileTransmitter
 
                 foreach (string drop in dropData)
                 {
+                    int fixFullName = 1;
 
                     //определяем папку из которой он ето перетащил
                     parentDir = Directory.GetParent(drop);
                     grantParentDir = Directory.GetParent(parentDir.FullName);
+                    
 
-                    //количество символов, которые будем обрезать(+2 чтобы убрать /)
-                    fixPath = grantParentDir.FullName.Length + parentDir.Name.Length + 2;
+                    if (/*parentDir == null || */grantParentDir == null)
+                        fixFullName = 0;
+
+                    //if (parentDir == null && grantParentDir == null)
+                    //    fixFullName = -1;
+
+                    // fixFullName - количество символов, которые будем обрезать(+2 чтобы убрать /)
+                    fixPath = (grantParentDir != null ? grantParentDir.FullName.Length : 0) + (parentDir != null ? parentDir.Name.Length : 0) + fixFullName;
 
                     //если это файл
                     if (File.Exists(drop))
