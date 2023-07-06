@@ -80,7 +80,6 @@ namespace FileTransmitter
             {
                 MessageBox.Show(ex.Message);
             }
-
         } 
 
         //получение данных
@@ -89,7 +88,7 @@ namespace FileTransmitter
             List<byte> data = new List<byte>();
             byte[] fileBody;
             byte[] oneChar = new byte[1];
-            int countBytes = 0;
+            int resultBytes = 0;
             string fileName = "";
             long fileLength;
             string[] dataInfo;
@@ -104,15 +103,14 @@ namespace FileTransmitter
                 //считываем имя файла
                 while (true)
                 {
-                    countBytes = await _socket.ReceiveAsync(oneChar, SocketFlags.None);
-                    if (countBytes == 0 || oneChar[0] == '*')
+                    resultBytes = await _socket.ReceiveAsync(oneChar, SocketFlags.None);
+                    if (resultBytes == 0 || oneChar[0] == '*')
                         break;
                     //заполняем буфер
                     data.Add(oneChar[0]);
                 }
 
                 charArray = new char[data.Count];
-
 
                 //переводим название файла в строковый формат
                 int resultToConvert = Encoding.UTF8.GetDecoder().GetChars(data.ToArray(), charArray, true);//.GetString(data.ToArray());
@@ -126,12 +124,10 @@ namespace FileTransmitter
                 Array.Resize(ref charArray, resultToConvert);
 
                 strBuff = new string(charArray);
-
                
                 dataInfo = strBuff.Split('|');
 
                
-
                 switch (dataInfo[0])
                 {
                     case "DIRS":
@@ -217,7 +213,6 @@ namespace FileTransmitter
                             MessageBox.Show("Ошибка записи пустого файла" + ex.Message);
                         }
 
-
                         //отправляем сообщение о том, что очередной файл принят и обработан
                         await _socket.SendAsync(Encoding.UTF8.GetBytes("FILESERVISED|0|0*"), SocketFlags.None);
                         break;
@@ -239,20 +234,6 @@ namespace FileTransmitter
                             break;
                         }
 
-                        //---------------------------------------------------------------------------------------
-
-                        //fileBody = new byte[fileLength];
-                        
-                        
-
-                        
-
-                        //Array.Resize(ref fileBody, countBytes);
-
-
-                        //---------------------------------------------------------------------------------------
-
-
                         try
                         {
                             
@@ -262,28 +243,25 @@ namespace FileTransmitter
                             //создаем буфер 2 MB
                             fileBody = new byte[2097152];
 
+                            long countBytes = 0;
                             while (true)
-                            {                               
+                            {
                                 //считываем 2 метра из потока
-                                countBytes = await _socket.ReceiveAsync(fileBody, SocketFlags.None);
+                                resultBytes = await _socket.ReceiveAsync(fileBody, SocketFlags.Partial);
 
-                                ////обрезаем все что не является нашим файлом
-                                //Array.Resize(ref fileBody, countBytes);
+                                countBytes += resultBytes;
 
                                 //записываем считанные байты в файл
-                                binaryWriter.Write(fileBody, 0, countBytes);
-
+                                binaryWriter.Write(fileBody, 0, resultBytes);
+                                
                                 //если мы считали весь файл в поток, то выходим из цикла
-                                if (binaryWriter.BaseStream.Length == fileLength) break;
+                                if (countBytes == fileLength) 
+                                    break;
                             }
-                            
+
                             //закрываем поток записи и высвобождаем его память
                             binaryWriter.Close();
-                            
 
-
-                            //записываем файл на диск и ждём пока он запишется
-                            //await Task.Run(()=> File.WriteAllBytes(@"Download\" + fileName, fileBody));
                             Dispatcher.Invoke(() => WinMain.Title = fileName);
                         }
                         catch (Exception ex)
@@ -294,78 +272,82 @@ namespace FileTransmitter
                             await _socket.SendAsync(Encoding.UTF8.GetBytes("ERROR|0|0*"), SocketFlags.None);
                         }
 
-
                         //отправляем сообщение о том, что очередной файл принят и обработан
                         await _socket.SendAsync(Encoding.UTF8.GetBytes("FILESERVISED|0|0*"), SocketFlags.None);
-
                         break;
                 
 
                     default:
                         _errorDataGet++;// отмечаем неизвестный пакет = сбой при получение файла
                         //отправляем сообщение об ошибке отправляющей программе
-                        await _socket.SendAsync(Encoding.UTF8.GetBytes("ERROR|0|0*"), SocketFlags.None);
-                        //_countFilesForGet--;
-
-                        
+                        await _socket.SendAsync(Encoding.UTF8.GetBytes("ERROR|0|0*"), SocketFlags.None);                                            
                         break;
                 }
 
                 _countFilesForGet--;
 
-
                 //очищаем буферы
-                data.Clear();
-              
+                data.Clear();             
             }
-
         }
        
         //отправка данных(файл)
         private async Task SetDataFiles() 
         {
-            byte[] data;
-            byte[] bodyFile = new byte[1];
             byte[] dataCaption;
             FileInfo fileInfo;
             try
             {
-                fileNameStruct = allFiles[_countFilesForSet - 1]; //поправка на индекс
+                fileNameStruct = allFiles[--_countFilesForSet]; //поправка на индекс
 
-                    if (fileNameStruct.NameShort.Contains('|') || fileNameStruct.NameShort.Contains('*'))
+                if (fileNameStruct.NameShort.Contains('|') || fileNameStruct.NameShort.Contains('*'))
+                {
+                    MessageBox.Show("Имя файла {0} содержит некорректные символы (| или *)\nКопирование не возможно. Файл будет пропущен.", fileNameStruct.NameShort);
+                }
+                else
+                {
+                    fileInfo = new FileInfo(fileNameStruct.NameFull);
+
+                    //если файл пустой
+                    if (fileInfo.Length == 0)
                     {
-                        MessageBox.Show("Имя файла {0} содержит некорректные символы (| или *)\nКопирование не возможно. Файл будет пропущен.", fileNameStruct.NameShort);
+                        dataCaption = Encoding.UTF8.GetBytes($"FILEZERO|{fileNameStruct.NameShort}|0*");
+                        //отправляем пакет
+                        await _socket.SendAsync(dataCaption, SocketFlags.None);
                     }
                     else
-                    {
-                        fileInfo = new FileInfo(fileNameStruct.NameFull);
+                    {                   
+                        dataCaption = Encoding.UTF8.GetBytes($"FILE|{fileNameStruct.NameShort}|{fileInfo.Length}*");
+                        //отправляем заголовок
+                        await _socket.SendAsync(dataCaption, SocketFlags.None);
 
-                        //если файл пустой
-                        if (fileInfo.Length == 0)
+                        //создаем поток для чтения файла
+                        using (BinaryReader binaryReader = new BinaryReader(fileInfo.OpenRead()))
                         {
-                            data = Encoding.UTF8.GetBytes($"FILEZERO|{fileNameStruct.NameShort}|0*");
+                            //буфер для чтения части файла
+                            byte[] dataBodyFile;
+                            long countBytes = 0;
+                            int resultBytes = 0;
+                            dataBodyFile = new byte[2097152];
+
+                            while (true)
+                            {
+                                dataBodyFile = binaryReader.ReadBytes(dataBodyFile.Length);
+                                if (dataBodyFile.Length == 0) break;
+
+                                resultBytes = await _socket.SendAsync(dataBodyFile, SocketFlags.Partial);
+
+                                countBytes += resultBytes;
+
+                                //если данных в потоке больше нет(достигли конца потока), то выходим из цикла
+                                if (binaryReader.BaseStream.Length == countBytes) break;
+                            }
                         }
-                        else
-                        {
-                            await Task.Run(()=> bodyFile = File.ReadAllBytes(fileNameStruct.NameFull));
-                        
-                            dataCaption = Encoding.UTF8.GetBytes($"FILE|{fileNameStruct.NameShort}|{fileInfo.Length}*");
-
-                            //объединяем все в один пакет
-                            data = dataCaption.Concat(bodyFile).ToArray();
-                        }
-
-                        //отправляем пакет
-                        await _socket.SendAsync(data, SocketFlags.None);
-
-                        Dispatcher.Invoke(()=> WinMain.Title = fileNameStruct.NameShort);
-
                     }
-               
-                _countFilesForSet--;
 
-
-
+                    Dispatcher.Invoke(()=> WinMain.Title = fileNameStruct.NameShort);
+                }               
+                
             }
             catch (Exception ex)
             {
