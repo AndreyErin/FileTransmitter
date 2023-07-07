@@ -6,6 +6,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Reflection;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media;
@@ -17,6 +18,9 @@ namespace FileTransmitter
     /// </summary>
     public partial class MainWindow : Window
     {
+        private CancellationTokenSource cts = new CancellationTokenSource();
+        private CancellationToken token;
+
         private List<PathNames> allFiles = new List<PathNames>();
         private Socket _socket;
         private Socket _socketServerListener;
@@ -57,7 +61,23 @@ namespace FileTransmitter
                         if (myTask.IsCompletedSuccessfully)
                         {
                             //запускаем прием данных
-                            Task.Factory.StartNew(() => GetData());
+                            //Task.Factory.StartNew(() => GetData());
+
+                            token = cts.Token;
+
+                            //----------------------------------------------------------------------
+                            Task task = new Task(() => GetData(), token);
+
+                            task.Start();
+
+
+
+
+                            //----------------------------------------------------------------------
+
+
+
+
 
                             //разрешаем перетаскивание
                             lbxMain.AllowDrop = true;
@@ -122,7 +142,13 @@ namespace FileTransmitter
             {
                 MessageBox.Show(ex.Message);
             }
-        } 
+        }
+        //тесты
+        private void btnTest_Click(object sender, RoutedEventArgs e)
+        {
+            //останавливаем функцию приема данных
+            cts.Cancel();
+        }
 
         //получение данных
         private async Task GetData() 
@@ -137,6 +163,18 @@ namespace FileTransmitter
             string strBuff = "";
             char[] charArray;
 
+
+            //----------------------------------------------
+            //отмена функции получения данных
+            token.Register(() => 
+            {
+                MessageBox.Show("Прекращаем работу метода прием данных");
+                return;
+            });
+            //----------------------------------------------
+
+
+
             while (true)
             {
                 //очищаем буферы
@@ -145,7 +183,18 @@ namespace FileTransmitter
                 //считываем имя файла
                 while (true)
                 {
-                    resultBytes = await _socket.ReceiveAsync(oneChar, SocketFlags.None);
+                    try
+                    {
+                        resultBytes = await _socket.ReceiveAsync(oneChar, SocketFlags.None);
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show("Сокет закрыт. Выходим из функции приема данных\n" + ex.Message);
+                        return;
+                    }
+                    
+
+
                     if (resultBytes == 0 || oneChar[0] == '*')
                         break;
                     //заполняем буфер
@@ -556,5 +605,6 @@ namespace FileTransmitter
             public string NameShort;
             public string NameFull;
         }
+
     }
 }

@@ -35,7 +35,7 @@
             
             <Label Grid.Column="0" Content="Адрес сервера"/>
             <Label Grid.Column="1" Content="192.168.0.34"/>
-            <Button Grid.Column="2" Content="Изменить"/>
+            <Button x:Name="btnTest" Grid.Column="2" Content="Тесты" Click="btnTest_Click"/>
             
             <Label Grid.Column="3" Content="Адрес сервера"/>
             <Label Grid.Column="4" Content="192.168.0.34"/>
