@@ -35,21 +35,60 @@ namespace FileTransmitter
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
-            //разрешаем перетаскивание
-            lbxMain.AllowDrop = true;
+
         }
 
         //подключаемся к серверу
         private async void btnConnect_Click(object sender, RoutedEventArgs e)
         {
-            //выключаем кнопку сервера
-            btnStartServer.Visibility = Visibility.Hidden;
+            switch (btnConnect.Content)
+            {
+                case "Подключиться к серверу":
 
-            _socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-            await _socket.ConnectAsync("192.168.0.34", 7070);
+                    try
+                    {
+                        _socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+                        //создаем и запускаем задачу
+                        var myTask = _socket.ConnectAsync("192.168.0.34", 7070);
+                        //стоим и ждем ее завершения
+                        await myTask;
 
-            //запускаем прием данных
-            Task.Factory.StartNew(() => GetData());
+                        //если подключение установлено
+                        if (myTask.IsCompletedSuccessfully)
+                        {
+                            //запускаем прием данных
+                            Task.Factory.StartNew(() => GetData());
+
+                            //разрешаем перетаскивание
+                            lbxMain.AllowDrop = true;
+                            lbxMain.Background = Brushes.Ivory;
+                            btnConnect.Content = "Отключиться от сервера";
+                            //выключаем кнопку сервера
+                            btnStartServer.Visibility = Visibility.Hidden;
+                        }
+
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show("Не удалось подключиться к серверу.\n" + ex.Message);
+                    }
+                    break;
+
+                case "Отключиться от сервера":
+                    btnStartServer.Visibility = Visibility.Visible;
+
+                    _socket.Shutdown( SocketShutdown.Both);
+                    _socket.Close();
+                    _socket.Dispose();
+
+                    //запрещаем перетаскивание
+                    lbxMain.AllowDrop = false;
+                    lbxMain.Background = Brushes.Red;
+                    btnConnect.Content = "Подключиться к серверу";
+                    break;
+            }
+
+
         }
 
         //запускаем сервер
@@ -70,11 +109,14 @@ namespace FileTransmitter
                 IPEndPoint iPEndPoint = new IPEndPoint(IPAddress.Any, 7070);
                 _socketServerListener.Bind(iPEndPoint);
 
-                _socketServerListener.Listen();
+                _socketServerListener.Listen(0);
 
                 //запускаем прием данных
                 _socket = await _socketServerListener.AcceptAsync();
                 Task.Factory.StartNew(() => GetData());
+                //разрешаем перетаскивание
+                lbxMain.AllowDrop = true;
+                lbxMain.Background = Brushes.Ivory;
             }
             catch (Exception ex)
             {

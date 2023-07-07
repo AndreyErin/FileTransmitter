@@ -43,7 +43,7 @@
         </Grid>
 
 
-        <ListBox x:Name="lbxMain" Grid.Row="1"  Background="Ivory" Drop="lbxMain_Drop"
+        <ListBox x:Name="lbxMain" Grid.Row="1"  Background="Red" Drop="lbxMain_Drop"
                  Height="50" Width="50" HorizontalAlignment="Right" VerticalAlignment="Top"/>
 
         <TextBox Grid.Row="2" x:Name="txtStat" VerticalScrollBarVisibility="Visible" HorizontalScrollBarVisibility="Visible" />
