@@ -165,11 +165,13 @@ namespace FileTransmitter
 
 
             //----------------------------------------------
+            bool stopGetData = false;
+
             //отмена функции получения данных
             token.Register(() => 
             {
                 MessageBox.Show("Прекращаем работу метода прием данных");
-                return;
+                stopGetData = true;
             });
             //----------------------------------------------
 
@@ -183,17 +185,18 @@ namespace FileTransmitter
                 //считываем имя файла
                 while (true)
                 {
-                    try
-                    {
+                    //try
+                    //{
                         resultBytes = await _socket.ReceiveAsync(oneChar, SocketFlags.None);
-                    }
-                    catch (Exception ex)
-                    {
-                        MessageBox.Show("Сокет закрыт. Выходим из функции приема данных\n" + ex.Message);
-                        return;
-                    }
-                    
+                    //}
+                    //catch (Exception ex)
+                    //{
+                    //    MessageBox.Show("Сокет закрыт. Выходим из функции приема данных\n" + ex.Message);
+                    //    return;
+                    //}
 
+                    //остановка через токен
+                    if (stopGetData) return;
 
                     if (resultBytes == 0 || oneChar[0] == '*')
                         break;
