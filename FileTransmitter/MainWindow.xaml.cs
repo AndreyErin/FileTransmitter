@@ -1,10 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Net;
 using System.Net.Sockets;
-using System.Reflection;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -18,7 +16,7 @@ namespace FileTransmitter
     /// </summary>
     public partial class MainWindow : Window
     {
-        private CancellationTokenSource cts = new CancellationTokenSource();
+        private CancellationTokenSource cts;
         private CancellationToken token;
 
         private List<PathNames> allFiles = new List<PathNames>();
@@ -48,7 +46,6 @@ namespace FileTransmitter
             switch (btnConnect.Content)
             {
                 case "Подключиться к серверу":
-
                     try
                     {
                         _socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
@@ -60,23 +57,11 @@ namespace FileTransmitter
                         //если подключение установлено
                         if (myTask.IsCompletedSuccessfully)
                         {
-                            //запускаем прием данных
-                            //Task.Factory.StartNew(() => GetData());
-
+                            //запускаем прием данных, используем токен отмены
+                            cts = new CancellationTokenSource();
                             token = cts.Token;
-
-                            //----------------------------------------------------------------------
                             Task task = new Task(() => GetData(), token);
-
                             task.Start();
-
-
-
-
-                            //----------------------------------------------------------------------
-
-
-
 
 
                             //разрешаем перетаскивание
@@ -86,7 +71,6 @@ namespace FileTransmitter
                             //выключаем кнопку сервера
                             btnStartServer.Visibility = Visibility.Hidden;
                         }
-
                     }
                     catch (Exception ex)
                     {
@@ -96,6 +80,9 @@ namespace FileTransmitter
 
                 case "Отключиться от сервера":
                     btnStartServer.Visibility = Visibility.Visible;
+
+                    //останавливаем функцию приема данных с помощью токена
+                    cts.Cancel();
 
                     _socket.Shutdown( SocketShutdown.Both);
                     _socket.Close();
@@ -107,24 +94,64 @@ namespace FileTransmitter
                     btnConnect.Content = "Подключиться к серверу";
                     break;
             }
-
-
         }
 
         //запускаем сервер
         private void btnStartServer_Click(object sender, RoutedEventArgs e)
         {
-            //выключаем кнопку клиента
-            btnConnect.Visibility = Visibility.Hidden; 
+            switch (btnStartServer.Content)
+            {
+                case "Запустить сервер":
+                    StartServerMode();
 
-            StartServerMode();            
+                    //разрешаем перетаскивание
+                    lbxMain.AllowDrop = true;
+                    lbxMain.Background = Brushes.Ivory;
+
+                    //выключаем кнопку клиента
+                    btnConnect.Visibility = Visibility.Hidden;
+
+                    btnStartServer.Content = "Остановить сервер";
+                    break;
+
+                case "Остановить сервер":
+                    //если подключение клиента было
+                    if (_socket != null)
+                    {
+                        //останавливаем функцию приема данных
+                        cts.Cancel();
+                        _socket.Shutdown(SocketShutdown.Both);
+                        _socket.Close();
+                        _socket.Dispose();
+                    }
+
+                    //останавливаем сокет прослушки подключения клиентов
+                    //_socketServerListener.Shutdown(SocketShutdown.Both);
+                    _socketServerListener.Close();
+                    _socketServerListener.Dispose();
+
+                    //запрещаем перетаскивание
+                    lbxMain.AllowDrop = false;
+                    lbxMain.Background = Brushes.Red;
+
+                    //включаем кнопку клиента
+                    btnConnect.Visibility = Visibility.Visible;
+
+                    btnStartServer.Content = "Запустить сервер";
+                    break;
+            }
+                   
         }
 
         //запускаем прослушивание порта
         private async Task StartServerMode() 
         {
-            try
-            {
+            //try
+            //{
+                //создаем токен отмены для функции приема данных
+                cts = new CancellationTokenSource();
+                token = cts.Token;
+
                 _socketServerListener = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
                 IPEndPoint iPEndPoint = new IPEndPoint(IPAddress.Any, 7070);
                 _socketServerListener.Bind(iPEndPoint);
@@ -133,357 +160,24 @@ namespace FileTransmitter
 
                 //запускаем прием данных
                 _socket = await _socketServerListener.AcceptAsync();
-                Task.Factory.StartNew(() => GetData());
-                //разрешаем перетаскивание
-                lbxMain.AllowDrop = true;
-                lbxMain.Background = Brushes.Ivory;
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show(ex.Message);
-            }
+                //если мы прервали прослушку
+                if (_socket == null) return;
+
+
+                //запускаем прием данных через токен
+                Task task = new Task(()=> GetData(), token);
+                task.Start();
+            //}
+            //catch (Exception ex)
+            //{
+            //    MessageBox.Show("Не удалось запустить сервер\n" + ex.Message);
+            //}
         }
         //тесты
         private void btnTest_Click(object sender, RoutedEventArgs e)
         {
             //останавливаем функцию приема данных
             cts.Cancel();
-        }
-
-        //получение данных
-        private async Task GetData() 
-        {
-            List<byte> data = new List<byte>();
-            byte[] fileBody;
-            byte[] oneChar = new byte[1];
-            int resultBytes = 0;
-            string fileName = "";
-            long fileLength;
-            string[] dataInfo;
-            string strBuff = "";
-            char[] charArray;
-
-
-            //----------------------------------------------
-            bool stopGetData = false;
-
-            //отмена функции получения данных
-            token.Register(() => 
-            {
-                MessageBox.Show("Прекращаем работу метода прием данных");
-                stopGetData = true;
-            });
-            //----------------------------------------------
-
-
-
-            while (true)
-            {
-                //очищаем буферы
-                data.Clear();
-
-                //считываем имя файла
-                while (true)
-                {
-                    //try
-                    //{
-                        resultBytes = await _socket.ReceiveAsync(oneChar, SocketFlags.None);
-                    //}
-                    //catch (Exception ex)
-                    //{
-                    //    MessageBox.Show("Сокет закрыт. Выходим из функции приема данных\n" + ex.Message);
-                    //    return;
-                    //}
-
-                    //остановка через токен
-                    if (stopGetData) return;
-
-                    if (resultBytes == 0 || oneChar[0] == '*')
-                        break;
-                    //заполняем буфер
-                    data.Add(oneChar[0]);
-                }
-
-                charArray = new char[data.Count];
-
-                //переводим название файла в строковый формат
-                int resultToConvert = Encoding.UTF8.GetDecoder().GetChars(data.ToArray(), charArray, true);//.GetString(data.ToArray());
-
-                if (resultToConvert != data.Count)
-                {
-                    //MessageBox.Show("Чета тута аще не камильфо");
-                }
-
-                //обрезаем массив до реально считанных символов
-                Array.Resize(ref charArray, resultToConvert);
-
-                strBuff = new string(charArray);
-               
-                dataInfo = strBuff.Split('|');
-
-               
-                switch (dataInfo[0])
-                {
-                    case "DIRS":
-                        //создаем все папки
-                        for (int i = 1; i < dataInfo.Length; i++)
-                        {
-                            Directory.CreateDirectory(@"Download\" + dataInfo[i]);
-                        }
-                        break;
-
-                    case "STATISTIC":
-
-                        //обнуляем счетчик
-                        _errorDataGet = 0;
-                        _countFilesForGet = int.Parse(dataInfo[1]);
-                        Action action = () =>
-                        {
-                            //блокируем перетаскивание Drag & Drop
-                            lbxMain.AllowDrop = false;
-                            lbxMain.Background = Brushes.Red;
-                            WinMain.Title = "Получение данных";
-                        };
-                        Dispatcher.Invoke(action);
-                        break;
-
-                    case "TRANSFEREND":
-                        Action action2 = () =>
-                        {
-                            //Разблокируем перетаскивание Drag & Drop
-                            lbxMain.AllowDrop = true;
-                            lbxMain.Background = Brushes.Ivory;
-                            WinMain.Title = $"Все данные получены. Ошибок: {_errorDataGet}";                            
-                        };
-                        Dispatcher.Invoke(action2);
-                        break;
-
-
-                    //---------/это сообщение получает передающая сторона
-                    case "FILESERVISED":
-                        //если файлы для отправки еще есть
-                        if (_countFilesForSet > 0)
-                        {
-                            await SetDataFiles();//отправляем следующий файл
-                        }                      
-                        //если все данные отправлены то разблокируем перетаскивание Drag & Drop
-                        else
-                        {
-                            Action action147 = () =>
-                            {
-                                lbxMain.AllowDrop = true;
-                                lbxMain.Background = Brushes.Ivory;
-                                WinMain.Title = $"Все данные отправлены, Ошибок: {_errorDataSet}";
-                            };
-                            Dispatcher.Invoke(action147);
-
-                            //отправляем сообщение о том, что передача данных окончена
-                            await _socket.SendAsync(Encoding.UTF8.GetBytes("TRANSFEREND|0|0*"), SocketFlags.None);
-                        }
-                        break;
-                    
-                    case "ERROR":
-                        //получена ошибка
-                        _errorDataSet++;
-                        
-                        break;
-                    //---------/это сообщение получает передающая сторона
-
-
-
-
-                    case "FILEZERO":
-                        fileName = dataInfo[1];
-
-                        try
-                        {
-                            //создаем файл на диске
-                            using FileStream fs = File.Create(@"Download\" + fileName);
-
-                            Dispatcher.Invoke(()=> WinMain.Title = fileName);
-                        }
-                        catch (Exception ex)
-                        {
-                            MessageBox.Show("Ошибка записи пустого файла" + ex.Message);
-                        }
-
-                        //отправляем сообщение о том, что очередной файл принят и обработан
-                        await _socket.SendAsync(Encoding.UTF8.GetBytes("FILESERVISED|0|0*"), SocketFlags.None);
-                        break;
-
-                    case "FILE":
-                        fileName = dataInfo[1];
-
-                        bool canParse = long.TryParse(dataInfo[2], out long result);
-                        if (canParse)
-                        {
-                            fileLength = result;
-                        }
-                        else
-                        {
-                            //отправляем сообщение об ошибке отправляющей программе
-                            await _socket.SendAsync(Encoding.UTF8.GetBytes("ERROR|0|0*"), SocketFlags.None);
-                            //_countFilesForGet--;
-                            _errorDataGet++;
-                            break;
-                        }
-
-                        try
-                        {
-                            
-                            FileInfo fileInfo = new FileInfo(@"Download\" + fileName);
-                            BinaryWriter binaryWriter = new BinaryWriter(fileInfo.OpenWrite());
-                            
-                            //создаем буфер 2 MB
-                            fileBody = new byte[2097152];
-
-                            long countBytes = 0;
-                            while (true)
-                            {
-                                //считываем 2 метра из потока
-                                resultBytes = await _socket.ReceiveAsync(fileBody, SocketFlags.Partial);
-
-                                countBytes += resultBytes;
-
-                                //записываем считанные байты в файл
-                                binaryWriter.Write(fileBody, 0, resultBytes);
-                                
-                                //если мы считали весь файл в поток, то выходим из цикла
-                                if (countBytes == fileLength) 
-                                    break;
-                            }
-
-                            //закрываем поток записи и высвобождаем его память
-                            binaryWriter.Close();
-
-                            Dispatcher.Invoke(() => WinMain.Title = fileName);
-                        }
-                        catch (Exception ex)
-                        {
-                            Dispatcher.Invoke(()=> MessageBox.Show("Ошибка записи файла\n" + ex.Message));
-
-                            _errorDataGet++;
-                            await _socket.SendAsync(Encoding.UTF8.GetBytes("ERROR|0|0*"), SocketFlags.None);
-                        }
-
-                        //отправляем сообщение о том, что очередной файл принят и обработан
-                        await _socket.SendAsync(Encoding.UTF8.GetBytes("FILESERVISED|0|0*"), SocketFlags.None);
-                        break;
-                
-
-                    default:
-                        _errorDataGet++;// отмечаем неизвестный пакет = сбой при получение файла
-                        //отправляем сообщение об ошибке отправляющей программе
-                        await _socket.SendAsync(Encoding.UTF8.GetBytes("ERROR|0|0*"), SocketFlags.None);                                            
-                        break;
-                }
-
-                _countFilesForGet--;
-
-                //очищаем буферы
-                data.Clear();             
-            }
-        }
-       
-        //отправка данных(файл)
-        private async Task SetDataFiles() 
-        {
-            byte[] dataCaption;
-            FileInfo fileInfo;
-            try
-            {
-                fileNameStruct = allFiles[--_countFilesForSet]; //поправка на индекс
-
-                if (fileNameStruct.NameShort.Contains('|') || fileNameStruct.NameShort.Contains('*'))
-                {
-                    MessageBox.Show("Имя файла {0} содержит некорректные символы (| или *)\nКопирование не возможно. Файл будет пропущен.", fileNameStruct.NameShort);
-                }
-                else
-                {
-                    fileInfo = new FileInfo(fileNameStruct.NameFull);
-
-                    //если файл пустой
-                    if (fileInfo.Length == 0)
-                    {
-                        dataCaption = Encoding.UTF8.GetBytes($"FILEZERO|{fileNameStruct.NameShort}|0*");
-                        //отправляем пакет
-                        await _socket.SendAsync(dataCaption, SocketFlags.None);
-                    }
-                    else
-                    {                   
-                        dataCaption = Encoding.UTF8.GetBytes($"FILE|{fileNameStruct.NameShort}|{fileInfo.Length}*");
-                        //отправляем заголовок
-                        await _socket.SendAsync(dataCaption, SocketFlags.None);
-
-                        //создаем поток для чтения файла
-                        using (BinaryReader binaryReader = new BinaryReader(fileInfo.OpenRead()))
-                        {
-                            //буфер для чтения части файла
-                            byte[] dataBodyFile;
-                            long countBytes = 0;
-                            int resultBytes = 0;
-                            dataBodyFile = new byte[2097152];
-
-                            while (true)
-                            {
-                                dataBodyFile = binaryReader.ReadBytes(dataBodyFile.Length);
-                                if (dataBodyFile.Length == 0) break;
-
-                                resultBytes = await _socket.SendAsync(dataBodyFile, SocketFlags.Partial);
-
-                                countBytes += resultBytes;
-
-                                //если данных в потоке больше нет(достигли конца потока), то выходим из цикла
-                                if (binaryReader.BaseStream.Length == countBytes) break;
-                            }
-                        }
-                    }
-
-                    Dispatcher.Invoke(()=> WinMain.Title = fileNameStruct.NameShort);
-                }               
-                
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show("отправка данных - файлы\n" + ex.Message);
-            }
-        }
-       
-        //отправка данных(папки/структуры всех папок)
-        private async Task SetDataDir(List<PathNames> DirName)
-        {
-            StringBuilder allDirs = new StringBuilder();
-
-            try
-            {
-                foreach (PathNames dirName in DirName)
-                {
-                    if (dirName.NameShort.Contains('|') || dirName.NameShort.Contains('*'))
-                    {
-                        MessageBox.Show("Имя папки {0} содержит некорректные символы (| или *)\nКопирование не возможно. Папка будет пропущена.", dirName.NameShort);
-                    }
-                    else
-                    {
-                        allDirs.Append('|' + dirName.NameShort);
-                    }
-                }
-
-                byte[] data = Encoding.UTF8.GetBytes($"DIRS{allDirs}*");
-                //отправляем пакет
-                await _socket.SendAsync(data, SocketFlags.None);
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show("отправка данных - папки\n" + ex.Message);
-            }            
-        }
-
-        //отправка статистики
-        private async Task SetStatistic(int countFiles) 
-        {
-            byte[] data = Encoding.UTF8.GetBytes($"STATISTIC|{countFiles}|0*");
-            //отправляем пакет
-            await _socket.SendAsync(data, SocketFlags.None);
         }
 
         //получаем имя файла при перетаскивание
@@ -501,7 +195,6 @@ namespace FileTransmitter
             //обнуляем счетчик
             _countFilesForSet = 0;
             _errorDataSet = 0;
-
 
             try
             {
@@ -563,9 +256,6 @@ namespace FileTransmitter
                 //на этот момент мы имеем 2 полных списка файлов и папок
                 //с их полными и относительными путями
 
-
-
-
                 //блокируем перетаскивание Drag & Drop
                 lbxMain.AllowDrop = false;
                 lbxMain.Background = Brushes.Red;
@@ -601,12 +291,6 @@ namespace FileTransmitter
             {
                 MessageBox.Show("Подготовка списка файлов\n" + ex.Message);
             }
-        }
-
-        public struct PathNames 
-        {
-            public string NameShort;
-            public string NameFull;
         }
 
     }
