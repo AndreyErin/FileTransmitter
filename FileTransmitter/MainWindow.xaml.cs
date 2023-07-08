@@ -2,10 +2,12 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
+using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Timers;
 using System.Windows;
 using System.Windows.Media;
 
@@ -16,13 +18,18 @@ namespace FileTransmitter
     /// </summary>
     public partial class MainWindow : Window
     {
+        private string _ipForConnect = "";
+        private int _port = 0;
+
+        System.Timers.Timer _timerCheckConnect = new System.Timers.Timer(500);
+
         private CancellationTokenSource cts;
         private CancellationToken token;
 
         private List<PathNames> allFiles = new List<PathNames>();
         private Socket _socket;
         private Socket _socketServerListener;
-        private bool _serverOn;
+        private bool _serverOn = false;
         private int _countFilesForGet = 0;//подсчет файлов которые надо принять в принимающей программе
         private int _countFilesForSet = 0;//подсчет файлов которые надо отправить, передающей программе
         private static int _errorDataGet = 0;//подсчет непонятных пакетов(будут в случае сбоя при получение файла)
@@ -37,7 +44,91 @@ namespace FileTransmitter
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
+            _ipForConnect = "192.168.0.34";
+            _port = 7070;
 
+            _timerCheckConnect.Elapsed += _timerCheckConnect_Elapsed;
+        }
+
+        //таймер проверяет есть ли соединение (не отвалилась ли программа на том конце)
+        private void _timerCheckConnect_Elapsed(object? sender, ElapsedEventArgs e)
+        {
+
+            bool connectTrue = false;
+
+            IPGlobalProperties iPGlobalProperties = IPGlobalProperties.GetIPGlobalProperties();
+            TcpConnectionInformation[] tcpConnectionInformation = iPGlobalProperties.GetActiveTcpConnections();
+            //StringBuilder stringBuilder = new StringBuilder();
+
+            switch (_serverOn)
+            {
+                case true:
+
+                    foreach (TcpConnectionInformation connect in tcpConnectionInformation)
+                    {
+                        //если в списке активных подключений есть наше и оно активно, то значит все норм
+                        if (connect.RemoteEndPoint.Equals(_socket.RemoteEndPoint) &&
+                            connect.LocalEndPoint.Equals(_socket.LocalEndPoint))
+                        {
+                            //соединение есть
+                            connectTrue = true;
+                        }
+                    }
+
+                    break;
+
+                case false:
+
+                    foreach (TcpConnectionInformation connect in tcpConnectionInformation)
+                    {
+                        //если в списке активных подключений есть наше и оно активно, то значит все норм
+                        if (connect.RemoteEndPoint.Equals(_socket.LocalEndPoint) &&
+                            connect.LocalEndPoint.Equals(_socket.RemoteEndPoint))
+                        {
+                            //соединение есть
+                            connectTrue = true;
+                        }
+                    }
+
+                    break;
+            }
+
+
+
+            //если соединения нет
+            if (!connectTrue)
+            {
+                //если программа запущенна в режиме сервера то останавливаем сервер
+                if (_serverOn)
+                {
+                    Dispatcher.Invoke(() => StopServer());
+
+                }
+                //если в режиме клиента то останавливаем клиент
+                else
+                {
+                    Dispatcher.Invoke(() => StopClient());
+                }
+
+                MessageBox.Show("Соединение кудат ушол");
+                //соединение разорвано
+            }
+        }
+
+        //тесты
+        private void btnTest_Click(object sender, RoutedEventArgs e)
+        {
+            IPGlobalProperties iPGlobalProperties = IPGlobalProperties.GetIPGlobalProperties();
+            TcpConnectionInformation[] tcpConnectionInformation = iPGlobalProperties.GetActiveTcpConnections();
+            StringBuilder stringBuilder = new StringBuilder();
+            foreach (var connection in tcpConnectionInformation)
+            {
+                stringBuilder.Append(connection.LocalEndPoint + " - " + connection.RemoteEndPoint + " - " + connection.State + "\n");
+            }
+
+            stringBuilder.Append("\n\n" + _socket.LocalEndPoint + " - " + _socket.RemoteEndPoint);
+
+            MessageBox.Show(stringBuilder.ToString());
         }
 
         //подключаемся к серверу
@@ -50,7 +141,7 @@ namespace FileTransmitter
                     {
                         _socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
                         //создаем и запускаем задачу
-                        var myTask = _socket.ConnectAsync("192.168.0.34", 7070);
+                        var myTask = _socket.ConnectAsync(_ipForConnect, _port);
                         //стоим и ждем ее завершения
                         await myTask;
 
@@ -70,6 +161,8 @@ namespace FileTransmitter
                             btnConnect.Content = "Отключиться от сервера";
                             //выключаем кнопку сервера
                             btnStartServer.Visibility = Visibility.Hidden;
+
+                            _timerCheckConnect.Start();
                         }
                     }
                     catch (Exception ex)
@@ -79,19 +172,7 @@ namespace FileTransmitter
                     break;
 
                 case "Отключиться от сервера":
-                    btnStartServer.Visibility = Visibility.Visible;
-
-                    //останавливаем функцию приема данных с помощью токена
-                    cts.Cancel();
-
-                    _socket.Shutdown( SocketShutdown.Both);
-                    _socket.Close();
-                    _socket.Dispose();
-
-                    //запрещаем перетаскивание
-                    lbxMain.AllowDrop = false;
-                    lbxMain.Background = Brushes.Red;
-                    btnConnect.Content = "Подключиться к серверу";
+                    StopClient();
                     break;
             }
         }
@@ -102,6 +183,7 @@ namespace FileTransmitter
             switch (btnStartServer.Content)
             {
                 case "Запустить сервер":
+                    _serverOn = true;
                     StartServerMode();
 
                     //разрешаем перетаскивание
@@ -112,35 +194,64 @@ namespace FileTransmitter
                     btnConnect.Visibility = Visibility.Hidden;
 
                     btnStartServer.Content = "Остановить сервер";
+                    
+                   
                     break;
 
                 case "Остановить сервер":
-                    //если подключение клиента было
-                    if (_socket != null)
-                    {
-                        //останавливаем функцию приема данных
-                        cts.Cancel();
-                        _socket.Shutdown(SocketShutdown.Both);
-                        _socket.Close();
-                        _socket.Dispose();
-                    }
-
-                    //останавливаем сокет прослушки подключения клиентов
-                    //_socketServerListener.Shutdown(SocketShutdown.Both);
-                    _socketServerListener.Close();
-                    _socketServerListener.Dispose();
-
-                    //запрещаем перетаскивание
-                    lbxMain.AllowDrop = false;
-                    lbxMain.Background = Brushes.Red;
-
-                    //включаем кнопку клиента
-                    btnConnect.Visibility = Visibility.Visible;
-
-                    btnStartServer.Content = "Запустить сервер";
+                    StopServer();
                     break;
             }
                    
+        }
+
+        private void StopClient() 
+        {
+            _timerCheckConnect.Stop();
+
+            btnStartServer.Visibility = Visibility.Visible;
+
+            //останавливаем функцию приема данных с помощью токена
+            cts.Cancel();
+
+            _socket.Shutdown(SocketShutdown.Both);
+            _socket.Close();
+            _socket.Dispose();
+
+            //запрещаем перетаскивание
+            lbxMain.AllowDrop = false;
+            lbxMain.Background = Brushes.Red;
+            btnConnect.Content = "Подключиться к серверу";
+        }
+
+        private void StopServer() 
+        {
+            _timerCheckConnect.Stop();
+
+            //если подключение клиента было
+            if (_socket != null)
+            {
+                //останавливаем функцию приема данных
+                cts.Cancel();
+                _socket.Shutdown(SocketShutdown.Both);
+                _socket.Close();
+                _socket.Dispose();
+            }
+
+            //останавливаем сокет прослушки подключения клиентов
+            //_socketServerListener.Shutdown(SocketShutdown.Both);
+            _socketServerListener.Close();
+            _socketServerListener.Dispose();
+
+            //запрещаем перетаскивание
+            lbxMain.AllowDrop = false;
+            lbxMain.Background = Brushes.Red;
+
+            //включаем кнопку клиента
+            btnConnect.Visibility = Visibility.Visible;
+
+            btnStartServer.Content = "Запустить сервер";
+            _serverOn = false;
         }
 
         //запускаем прослушивание порта
@@ -148,37 +259,36 @@ namespace FileTransmitter
         {
             //try
             //{
-                //создаем токен отмены для функции приема данных
-                cts = new CancellationTokenSource();
-                token = cts.Token;
+            //создаем токен отмены для функции приема данных
+            cts = new CancellationTokenSource();
+            token = cts.Token;
 
-                _socketServerListener = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-                IPEndPoint iPEndPoint = new IPEndPoint(IPAddress.Any, 7070);
-                _socketServerListener.Bind(iPEndPoint);
+            _socketServerListener = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+            IPEndPoint iPEndPoint = new IPEndPoint(IPAddress.Any, 7070);
+            _socketServerListener.Bind(iPEndPoint);
 
-                _socketServerListener.Listen(0);
+            _socketServerListener.Listen(0);
 
-                //запускаем прием данных
-                _socket = await _socketServerListener.AcceptAsync();
-                //если мы прервали прослушку
-                if (_socket == null) return;
+            //запускаем ожидания подключения
+            _socket = await _socketServerListener.AcceptAsync();
+            //если мы прервали прослушку
+            if (_socket == null) return;
 
 
-                //запускаем прием данных через токен
-                Task task = new Task(()=> GetData(), token);
+
+            //запускаем прием данных через токен
+            Task task = new Task(()=> GetData(), token);
                 task.Start();
+
+            //если  подключение состоялось то запускаем таймер проверки соединения
+            _timerCheckConnect.Start();
             //}
             //catch (Exception ex)
             //{
             //    MessageBox.Show("Не удалось запустить сервер\n" + ex.Message);
             //}
         }
-        //тесты
-        private void btnTest_Click(object sender, RoutedEventArgs e)
-        {
-            //останавливаем функцию приема данных
-            cts.Cancel();
-        }
+
 
         //получаем имя файла при перетаскивание
         private async void lbxMain_Drop(object sender, DragEventArgs e)
