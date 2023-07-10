@@ -1,10 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Text;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Timers;
@@ -18,6 +20,8 @@ namespace FileTransmitter
     /// </summary>
     public partial class MainWindow : Window
     {
+        private Config? config = new Config();
+
         private string _ipForConnect = "";
         private int _port = 0;
 
@@ -44,8 +48,32 @@ namespace FileTransmitter
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
-            _ipForConnect = "192.168.0.34";
-            _port = 7070;
+
+            try
+            {
+                //вынаем настройки из файла
+
+                config = JsonSerializer.Deserialize<Config>(File.ReadAllText("config.json"));
+
+            }
+            catch (Exception ex)
+            {
+                //применяем стандартные настройки
+                config.Port = 7070;
+                config.IpAddress = "192.168.0.34";
+                config.DirectoryForSave = Directory.GetCurrentDirectory() + "\\Download";
+
+                //сохранение конфигурации в файл
+                string dataConfig = JsonSerializer.Serialize(config);
+                File.WriteAllText("config.json", dataConfig);
+
+                MessageBox.Show("Не удалось загрузить конфигурацию\nБудут применены настройки по умолчанию\n" + ex.Message, "Не сильно страшная ошибка", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+
+
+
+            _ipForConnect = config.IpAddress;
+            _port = config.Port;
 
             _timerCheckConnect.Elapsed += _timerCheckConnect_Elapsed;
         }
@@ -186,10 +214,6 @@ namespace FileTransmitter
                     _serverOn = true;
                     StartServerMode();
 
-                    //разрешаем перетаскивание
-                    lbxMain.AllowDrop = true;
-                    lbxMain.Background = Brushes.Ivory;
-
                     //выключаем кнопку клиента
                     btnConnect.Visibility = Visibility.Hidden;
 
@@ -279,6 +303,10 @@ namespace FileTransmitter
             //запускаем прием данных через токен
             Task task = new Task(()=> GetData(), token);
                 task.Start();
+
+            //разрешаем перетаскивание
+            lbxMain.AllowDrop = true;
+            lbxMain.Background = Brushes.Ivory;
 
             //если  подключение состоялось то запускаем таймер проверки соединения
             _timerCheckConnect.Start();
@@ -403,5 +431,12 @@ namespace FileTransmitter
             }
         }
 
+        private void WinMain_Unloaded(object sender, RoutedEventArgs e)
+        {
+            //сохранение конфигурации в файл
+            string dataConfig = JsonSerializer.Serialize(config);
+            File.WriteAllText("config.json", dataConfig);
+          
+        }
     }
 }

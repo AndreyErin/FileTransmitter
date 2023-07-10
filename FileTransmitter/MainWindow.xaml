@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:FileTransmitter"
         mc:Ignorable="d"
-        Title="Передача файлов" x:Name="WinMain" Height="200" Width="500" Loaded="Window_Loaded">
+        Title="Передача файлов" x:Name="WinMain" Height="200" Width="500" Loaded="Window_Loaded" Unloaded="WinMain_Unloaded">
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="auto"/>
