@@ -12,6 +12,7 @@ using System.Threading.Tasks;
 using System.Timers;
 using System.Windows;
 using System.Windows.Media;
+using WinForms = System.Windows.Forms;
 
 namespace FileTransmitter
 {
@@ -288,7 +289,7 @@ namespace FileTransmitter
             token = cts.Token;
 
             _socketServerListener = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-            IPEndPoint iPEndPoint = new IPEndPoint(IPAddress.Any, 7070);
+            IPEndPoint iPEndPoint = new IPEndPoint(IPAddress.Any, _port);
             _socketServerListener.Bind(iPEndPoint);
 
             _socketServerListener.Listen(0);
@@ -437,6 +438,55 @@ namespace FileTransmitter
             string dataConfig = JsonSerializer.Serialize(config);
             File.WriteAllText("config.json", dataConfig);
           
+        }
+
+        private void btnOptionsIP_Click(object sender, RoutedEventArgs e)
+        {
+            switch (btnOptionsIP.Content)
+            {
+                case "Адрес сервера":
+                    txtIP.IsEnabled = true;
+                    btnOptionsIP.Content = "Применить";
+                    break;
+
+                case "Применить":
+                    config.IpAddress = txtIP.Text;
+                    _ipForConnect = config.IpAddress;
+                    txtIP.IsEnabled = false;
+                    btnOptionsIP.Content = "Адрес сервера";
+                    break;
+            }
+        }
+
+        private void btnOptionsPort_Click(object sender, RoutedEventArgs e)
+        {
+            switch (btnOptionsPort.Content)
+            {
+                case "Порт":
+                    txtPort.IsEnabled = true;
+                    btnOptionsPort.Content = "Применить";
+                    break;
+
+                case "Применить":
+                    config.Port = int.Parse(txtPort.Text);
+                    _port = config.Port;
+                    txtPort.IsEnabled = false;
+                    btnOptionsPort.Content = "Порт";
+                    break;
+            }
+        }
+
+        private void btnOptionsDirectory_Click(object sender, RoutedEventArgs e)
+        {
+            WinForms.FolderBrowserDialog folderDialog = new WinForms.FolderBrowserDialog();
+            folderDialog.InitialDirectory = Directory.GetCurrentDirectory();
+
+            WinForms.DialogResult dialogResult = folderDialog.ShowDialog();
+
+            if (dialogResult == WinForms.DialogResult.OK)
+            {
+                config.DirectoryForSave = folderDialog.SelectedPath;
+            }
         }
     }
 }
