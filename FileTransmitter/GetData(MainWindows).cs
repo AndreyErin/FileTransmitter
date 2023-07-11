@@ -76,7 +76,7 @@ namespace FileTransmitter
                         //создаем все папки
                         for (int i = 1; i < dataInfo.Length; i++)
                         {
-                            Directory.CreateDirectory(@"Download\" + dataInfo[i]);
+                            Directory.CreateDirectory(config.DirectoryForSave + @"\" + dataInfo[i]);
                         }
                         break;
 
@@ -146,7 +146,7 @@ namespace FileTransmitter
                         try
                         {
                             //создаем файл на диске
-                            using FileStream fs = File.Create(@"Download\" + fileName);
+                            using FileStream fs = File.Create(config.DirectoryForSave + @"\" + fileName);
 
                             Dispatcher.Invoke(() => WinMain.Title = fileName);
                         }
@@ -179,7 +179,7 @@ namespace FileTransmitter
                         try
                         {
 
-                            FileInfo fileInfo = new FileInfo(@"Download\" + fileName);
+                            FileInfo fileInfo = new FileInfo(config.DirectoryForSave + @"\" + fileName);
                             BinaryWriter binaryWriter = new BinaryWriter(fileInfo.OpenWrite());
 
                             //создаем буфер 2 MB

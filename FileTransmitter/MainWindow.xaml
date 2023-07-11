@@ -31,6 +31,8 @@
 
 
         <ListBox x:Name="lbxMain" Grid.Row="3"  Background="Red" Drop="lbxMain_Drop" />
+        <Button Grid.Row="3" x:Name="btnOpenFolder" Content="Открыть папку" HorizontalAlignment="Right" Width="100" Click="btnOpenFolder_Click"/>
+
 
         <TextBox Grid.Row="4" x:Name="txtStat" VerticalScrollBarVisibility="Visible" HorizontalScrollBarVisibility="Visible" />
 

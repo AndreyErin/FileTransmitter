@@ -23,6 +23,7 @@ namespace FileTransmitter
     {
         private Config? config = new Config();
 
+        private string _directory;
         private string _ipForConnect = "";
         private int _port = 0;
 
@@ -75,6 +76,8 @@ namespace FileTransmitter
 
             _ipForConnect = config.IpAddress;
             _port = config.Port;
+            _directory = config.DirectoryForSave;
+
 
             _timerCheckConnect.Elapsed += _timerCheckConnect_Elapsed;
         }
@@ -435,9 +438,7 @@ namespace FileTransmitter
         private void WinMain_Unloaded(object sender, RoutedEventArgs e)
         {
             //сохранение конфигурации в файл
-            string dataConfig = JsonSerializer.Serialize(config);
-            File.WriteAllText("config.json", dataConfig);
-          
+            SaveConfig();
         }
 
         private void btnOptionsIP_Click(object sender, RoutedEventArgs e)
@@ -454,6 +455,9 @@ namespace FileTransmitter
                     _ipForConnect = config.IpAddress;
                     txtIP.IsEnabled = false;
                     btnOptionsIP.Content = "Адрес сервера";
+
+                    //сохранение конфигурации в файл
+                    SaveConfig();
                     break;
             }
         }
@@ -472,6 +476,9 @@ namespace FileTransmitter
                     _port = config.Port;
                     txtPort.IsEnabled = false;
                     btnOptionsPort.Content = "Порт";
+
+                    //сохранение конфигурации в файл
+                    SaveConfig();
                     break;
             }
         }
@@ -486,7 +493,23 @@ namespace FileTransmitter
             if (dialogResult == WinForms.DialogResult.OK)
             {
                 config.DirectoryForSave = folderDialog.SelectedPath;
+
+                //сохранение конфигурации в файл
+                SaveConfig();
             }
+        }
+
+        private void SaveConfig()
+        {
+            //сохранение конфигурации в файл
+            string dataConfig = JsonSerializer.Serialize(config);
+            File.WriteAllText("config.json", dataConfig);
+
+        }
+
+        private void btnOpenFolder_Click(object sender, RoutedEventArgs e)
+        {
+            System.Diagnostics.Process.Start( new System.Diagnostics.ProcessStartInfo(config.DirectoryForSave) { UseShellExecute = true});
         }
     }
 }
