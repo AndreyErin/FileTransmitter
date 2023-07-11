@@ -23,9 +23,6 @@ namespace FileTransmitter
             string[] dataInfo;
             string strBuff = "";
             char[] charArray;
-
-
-            //----------------------------------------------
             bool stopGetData = false;
 
             //отмена функции получения данных
@@ -34,8 +31,6 @@ namespace FileTransmitter
                 //MessageBox.Show("Прекращаем работу метода прием данных");
                 stopGetData = true;
             });
-            //----------------------------------------------
-
 
 
             while (true)
@@ -85,8 +80,14 @@ namespace FileTransmitter
                         //обнуляем счетчик
                         _errorDataGet = 0;
                         _countFilesForGet = int.Parse(dataInfo[1]);
+
                         Action action = () =>
                         {
+                            //прогресс-бар
+                            prgAllFiles.Maximum = _countFilesForGet;
+                            prgAllFiles.Value = 0;
+                            prgAllFiles.Visibility = Visibility.Visible;
+
                             //блокируем перетаскивание Drag & Drop
                             lbxMain.AllowDrop = false;
                             lbxMain.Background = Brushes.Red;
@@ -102,6 +103,8 @@ namespace FileTransmitter
                             lbxMain.AllowDrop = true;
                             lbxMain.Background = Brushes.Ivory;
                             WinMain.Title = $"Все данные получены. Ошибок: {_errorDataGet}";
+
+                            prgAllFiles.Visibility = Visibility.Hidden;
                         };
                         Dispatcher.Invoke(action2);
                         break;
@@ -160,6 +163,7 @@ namespace FileTransmitter
                         break;
 
                     case "FILE":
+
                         fileName = dataInfo[1];
 
                         bool canParse = long.TryParse(dataInfo[2], out long result);
@@ -178,6 +182,14 @@ namespace FileTransmitter
 
                         try
                         {
+                            //прогресс-бар
+                            Dispatcher.Invoke(() =>
+                            {
+                                prgFile.Minimum = 0;
+                                prgFile.Maximum = fileLength;
+                                prgFile.Visibility = Visibility.Visible;
+                            });
+
 
                             FileInfo fileInfo = new FileInfo(config.DirectoryForSave + @"\" + fileName);
                             BinaryWriter binaryWriter = new BinaryWriter(fileInfo.OpenWrite());
@@ -196,6 +208,9 @@ namespace FileTransmitter
                                 //записываем считанные байты в файл
                                 binaryWriter.Write(fileBody, 0, resultBytes);
 
+                                //прогресс-бар
+                                Dispatcher.Invoke(()=> prgFile.Value = countBytes);
+
                                 //если мы считали весь файл в поток, то выходим из цикла
                                 if (countBytes == fileLength)
                                     break;
@@ -204,7 +219,12 @@ namespace FileTransmitter
                             //закрываем поток записи и высвобождаем его память
                             binaryWriter.Close();
 
-                            Dispatcher.Invoke(() => WinMain.Title = fileName);
+                            
+                            Dispatcher.Invoke(() =>
+                            {
+                                WinMain.Title = fileName;
+                                prgFile.Visibility = Visibility.Hidden;//прогресс-бар
+                            });
                         }
                         catch (Exception ex)
                         {
@@ -227,6 +247,7 @@ namespace FileTransmitter
                 }
 
                 _countFilesForGet--;
+                Dispatcher.Invoke(()=>prgAllFiles.Value++);
 
                 //очищаем буферы
                 data.Clear();

@@ -26,8 +26,8 @@
             <Button Grid.Column="1" x:Name="btnStartServer" Content="Запустить сервер" Click="btnStartServer_Click" />
         </Grid>
 
-        <StatusBar  Grid.Row="1" Height="20" Background="LawnGreen"/>
-        <StatusBar  Grid.Row="2" Height="20" Background="YellowGreen"/>
+        <ProgressBar x:Name="prgAllFiles"  Grid.Row="1" Height="20" Background="LawnGreen" Minimum="0" Visibility="Hidden" />
+        <ProgressBar  x:Name="prgFile" Grid.Row="2" Height="20" Background="YellowGreen" Visibility="Hidden"/>
 
 
         <ListBox x:Name="lbxMain" Grid.Row="3"  Background="Red" Drop="lbxMain_Drop" />

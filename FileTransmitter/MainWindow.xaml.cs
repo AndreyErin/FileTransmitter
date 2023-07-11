@@ -21,6 +21,8 @@ namespace FileTransmitter
     /// </summary>
     public partial class MainWindow : Window
     {
+        WinForms.NotifyIcon notifyIcon;
+
         private Config? config = new Config();
 
         private string _directory;
@@ -50,7 +52,6 @@ namespace FileTransmitter
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
-
             try
             {
                 //вынаем настройки из файла
@@ -72,14 +73,35 @@ namespace FileTransmitter
                 MessageBox.Show("Не удалось загрузить конфигурацию\nБудут применены настройки по умолчанию\n" + ex.Message, "Не сильно страшная ошибка", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
 
-
-
             _ipForConnect = config.IpAddress;
             _port = config.Port;
             _directory = config.DirectoryForSave;
 
+            IconInTrey();
 
             _timerCheckConnect.Elapsed += _timerCheckConnect_Elapsed;
+        }
+
+        //трей
+        private void IconInTrey() 
+        {
+            notifyIcon = new WinForms.NotifyIcon() { Icon = new System.Drawing.Icon("app.ico")};
+            notifyIcon.Visible = true;
+            notifyIcon.DoubleClick += NotifyIcon_DoubleClick;
+        }
+
+        // 2й клик по трею
+        private void NotifyIcon_DoubleClick(object? sender, EventArgs e)
+        {
+            switch (WinMain.Visibility)
+            {
+                case Visibility.Visible:
+                    WinMain.Visibility = Visibility.Hidden;
+                    break;
+                case Visibility.Hidden:
+                    WinMain.Visibility = Visibility.Visible;
+                    break;
+            }
         }
 
         //таймер проверяет есть ли соединение (не отвалилась ли программа на том конце)
@@ -145,22 +167,6 @@ namespace FileTransmitter
                 MessageBox.Show("Соединение кудат ушол");
                 //соединение разорвано
             }
-        }
-
-        //тесты
-        private void btnTest_Click(object sender, RoutedEventArgs e)
-        {
-            IPGlobalProperties iPGlobalProperties = IPGlobalProperties.GetIPGlobalProperties();
-            TcpConnectionInformation[] tcpConnectionInformation = iPGlobalProperties.GetActiveTcpConnections();
-            StringBuilder stringBuilder = new StringBuilder();
-            foreach (var connection in tcpConnectionInformation)
-            {
-                stringBuilder.Append(connection.LocalEndPoint + " - " + connection.RemoteEndPoint + " - " + connection.State + "\n");
-            }
-
-            stringBuilder.Append("\n\n" + _socket.LocalEndPoint + " - " + _socket.RemoteEndPoint);
-
-            MessageBox.Show(stringBuilder.ToString());
         }
 
         //подключаемся к серверу
@@ -439,6 +445,7 @@ namespace FileTransmitter
         {
             //сохранение конфигурации в файл
             SaveConfig();
+            notifyIcon.Visible = false;
         }
 
         private void btnOptionsIP_Click(object sender, RoutedEventArgs e)
