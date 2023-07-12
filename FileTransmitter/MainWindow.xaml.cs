@@ -416,8 +416,6 @@ namespace FileTransmitter
                 //если файлы есть
                 if (allFiles.Count > 0)
                 {
-                    Dispatcher.Invoke(() => 
-                    { 
 
                     //прогресс бар
                     prgAllFiles.Minimum = 0;
@@ -430,12 +428,12 @@ namespace FileTransmitter
                     _countFilesForSet = allFiles.Count;
                     lblAllFiles.Content = $"Отправлено файлов: {0} из {allFiles.Count}.";
                         lblAllFiles.InvalidateVisual();
-                    });
+                    
 
                     //отправляем количество файлов принимающей программе
                     await SetStatistic(_countFilesForSet);
                     //отправляем первый файл, если он есть
-                    await SetDataFiles();
+                    Task.Run(()=> SetDataFiles());
                 }
                 else 
                 {
