@@ -13,6 +13,13 @@ namespace FileTransmitter
         //отправка данных(файл)
         private async Task SetDataFiles()
         {
+            //прогресс бар
+            Dispatcher.Invoke(() =>
+            {
+                prgFile.Minimum = 0;
+                
+            });
+
             byte[] dataCaption;
             FileInfo fileInfo;
             try
@@ -27,9 +34,24 @@ namespace FileTransmitter
                 {
                     fileInfo = new FileInfo(fileNameStruct.NameFull);
 
+                    //Dispatcher.Invoke(() =>
+                    //{
+                    //    lblFile.Content = fileNameStruct.NameShort;
+                    //    lblAllFiles.Content = $"Отправлено файлов: {prgAllFiles.Value++} из {prgAllFiles.Minimum}.";
+                    //});
+
+                    
+
                     //если файл пустой
                     if (fileInfo.Length == 0)
-                    {
+                    {                        
+                        //прогресс бар
+                        Dispatcher.Invoke(() =>
+                        {
+                            prgFile.Maximum = 1;
+                            prgFile.Value = 1; ;
+                        });
+
                         dataCaption = Encoding.UTF8.GetBytes($"FILEZERO|{fileNameStruct.NameShort}|0*");
                         //отправляем пакет
                         await _socket.SendAsync(dataCaption, SocketFlags.None);
@@ -49,6 +71,13 @@ namespace FileTransmitter
                             int resultBytes = 0;
                             dataBodyFile = new byte[2097152];
 
+                            //прогресс бар
+                            Dispatcher.Invoke(() =>
+                            {
+                                prgFile.Maximum = binaryReader.BaseStream.Length;
+                                prgFile.Value = 0;
+                            });
+
                             while (true)
                             {
                                 dataBodyFile = binaryReader.ReadBytes(dataBodyFile.Length);
@@ -58,13 +87,20 @@ namespace FileTransmitter
 
                                 countBytes += resultBytes;
 
+                                //прогресс бар
+                                Dispatcher.Invoke(() => prgFile.Value = countBytes);
+
                                 //если данных в потоке больше нет(достигли конца потока), то выходим из цикла
                                 if (binaryReader.BaseStream.Length == countBytes) break;
                             }
                         }
                     }
 
-                    Dispatcher.Invoke(() => WinMain.Title = fileNameStruct.NameShort);
+                    Dispatcher.Invoke(() =>
+                    {
+                        lblFile.Content = fileNameStruct.NameShort;
+                        lblAllFiles.Content = $"Отправлено файлов: {++prgAllFiles.Value} из {prgAllFiles.Maximum}.";
+                    });
                 }
 
             }

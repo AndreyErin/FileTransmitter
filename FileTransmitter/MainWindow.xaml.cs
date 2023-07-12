@@ -194,8 +194,9 @@ namespace FileTransmitter
 
 
                             //разрешаем перетаскивание
-                            lbxMain.AllowDrop = true;
-                            lbxMain.Background = Brushes.Ivory;
+                            lblMain.AllowDrop = true;
+                            lblMain.Background = Brushes.Ivory;
+                            lblMain.Content = "Тащи сюда свои файлы";
                             btnConnect.Content = "Отключиться от сервера";
                             //выключаем кнопку сервера
                             btnStartServer.Visibility = Visibility.Hidden;
@@ -253,8 +254,9 @@ namespace FileTransmitter
             _socket.Dispose();
 
             //запрещаем перетаскивание
-            lbxMain.AllowDrop = false;
-            lbxMain.Background = Brushes.Red;
+            lblMain.AllowDrop = false;
+            lblMain.Background = Brushes.MistyRose;
+            lblMain.Content = "Нет соединения";
             btnConnect.Content = "Подключиться к серверу";
         }
 
@@ -278,8 +280,9 @@ namespace FileTransmitter
             _socketServerListener.Dispose();
 
             //запрещаем перетаскивание
-            lbxMain.AllowDrop = false;
-            lbxMain.Background = Brushes.Red;
+            lblMain.AllowDrop = false;
+            lblMain.Background = Brushes.MistyRose;
+            lblMain.Content = "Нет соединения";
 
             //включаем кнопку клиента
             btnConnect.Visibility = Visibility.Visible;
@@ -291,8 +294,7 @@ namespace FileTransmitter
         //запускаем прослушивание порта
         private async Task StartServerMode() 
         {
-            //try
-            //{
+
             //создаем токен отмены для функции приема данных
             cts = new CancellationTokenSource();
             token = cts.Token;
@@ -315,21 +317,17 @@ namespace FileTransmitter
                 task.Start();
 
             //разрешаем перетаскивание
-            lbxMain.AllowDrop = true;
-            lbxMain.Background = Brushes.Ivory;
+            lblMain.AllowDrop = true;
+            lblMain.Background = Brushes.Ivory;
+            lblMain.Content = "Тащи сюда свои файлы";
 
             //если  подключение состоялось то запускаем таймер проверки соединения
-            _timerCheckConnect.Start();
-            //}
-            //catch (Exception ex)
-            //{
-            //    MessageBox.Show("Не удалось запустить сервер\n" + ex.Message);
-            //}
+            _timerCheckConnect.Start();  
         }
 
 
         //получаем имя файла при перетаскивание
-        private async void lbxMain_Drop(object sender, DragEventArgs e)
+        private async void lblMain_Drop(object sender, DragEventArgs e)
         {           
             List<PathNames> allDirectories = new List<PathNames>();           
             DirectoryInfo parentDir;
@@ -358,11 +356,9 @@ namespace FileTransmitter
                     grantParentDir = Directory.GetParent(parentDir.FullName);
                     
 
-                    if (/*parentDir == null || */grantParentDir == null)
+                    if (grantParentDir == null)
                         fixFullName = 0;
 
-                    //if (parentDir == null && grantParentDir == null)
-                    //    fixFullName = -1;
 
                     // fixFullName - количество символов, которые будем обрезать(+2 чтобы убрать /)
                     fixPath = (grantParentDir != null ? grantParentDir.FullName.Length : 0) + (parentDir != null ? parentDir.Name.Length : 0) + fixFullName;
@@ -405,9 +401,10 @@ namespace FileTransmitter
                 //с их полными и относительными путями
 
                 //блокируем перетаскивание Drag & Drop
-                lbxMain.AllowDrop = false;
-                lbxMain.Background = Brushes.Red;
-                WinMain.Title = "Отправка данных";
+                lblMain.Content = "Идет передача файлов";
+                lblMain.AllowDrop = false;
+                lblMain.Background = Brushes.Lavender;
+                //WinMain.Title = "Отправка данных";
 
                 //если папки есть
                 if (allDirectories.Count > 0)
@@ -419,7 +416,22 @@ namespace FileTransmitter
                 //если файлы есть
                 if (allFiles.Count > 0)
                 {
+                    Dispatcher.Invoke(() => 
+                    { 
+
+                    //прогресс бар
+                    prgAllFiles.Minimum = 0;
+                    prgAllFiles.Maximum = allFiles.Count;
+                    prgAllFiles.Value = 0;
+                    prgAllFiles.Visibility = Visibility.Visible;
+                    prgFile.Visibility = Visibility.Visible;
+                    prgFile.Minimum = 0;
+
                     _countFilesForSet = allFiles.Count;
+                    lblAllFiles.Content = $"Отправлено файлов: {0} из {allFiles.Count}.";
+                        lblAllFiles.InvalidateVisual();
+                    });
+
                     //отправляем количество файлов принимающей программе
                     await SetStatistic(_countFilesForSet);
                     //отправляем первый файл, если он есть
@@ -427,8 +439,8 @@ namespace FileTransmitter
                 }
                 else 
                 {
-                    lbxMain.AllowDrop = true;
-                    lbxMain.Background = Brushes.Ivory;
+                    lblMain.AllowDrop = true;
+                    lblMain.Background = Brushes.Ivory;
                     WinMain.Title = $"Все данные отправлены(Были только папки)";
                     //отправляем сообщение о том, что передача данных окончена
                     await _socket.SendAsync(Encoding.UTF8.GetBytes("TRANSFEREND|0|0*"), SocketFlags.None);

@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:FileTransmitter"
         mc:Ignorable="d"
-        Title="Передача файлов" x:Name="WinMain" Height="200" Width="500" Loaded="Window_Loaded" Unloaded="WinMain_Unloaded">
+        Title="Передача файлов" x:Name="WinMain" Height="250" Width="500" Loaded="Window_Loaded" Unloaded="WinMain_Unloaded">
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="auto"/>
@@ -26,11 +26,16 @@
             <Button Grid.Column="1" x:Name="btnStartServer" Content="Запустить сервер" Click="btnStartServer_Click" />
         </Grid>
 
-        <ProgressBar x:Name="prgAllFiles"  Grid.Row="1" Height="20" Background="LawnGreen" Minimum="0" Visibility="Hidden" />
-        <ProgressBar  x:Name="prgFile" Grid.Row="2" Height="20" Background="YellowGreen" Visibility="Hidden"/>
 
 
-        <ListBox x:Name="lbxMain" Grid.Row="3"  Background="Red" Drop="lbxMain_Drop" />
+        <ProgressBar x:Name="prgAllFiles"  Grid.Row="1" Height="20" Opacity="0.5" Foreground="DarkViolet"  Background="Lavender" Minimum="0" Visibility="Hidden" Panel.ZIndex="2"/>
+        <ProgressBar  x:Name="prgFile" Grid.Row="2" Height="20" Opacity="0.3" Foreground="DarkViolet" Background="Lavender" Visibility="Hidden" Panel.ZIndex="2"/>
+        <Label Grid.Row="1" x:Name="lblAllFiles" Content="Общий прогресс" Background="Lavender" BorderBrush="Brown" BorderThickness="1"/>
+        <Label Grid.Row="2" x:Name="lblFile" Content="Отдельный файл" Background="Lavender" BorderBrush="Brown" BorderThickness="1"/>
+
+        
+        
+        <Label x:Name="lblMain" Grid.Row="3"  Background="MistyRose" Drop="lblMain_Drop" Content="Нет соединения" HorizontalContentAlignment="Center"  VerticalContentAlignment="Center"/>
         <Button Grid.Row="3" x:Name="btnOpenFolder" Content="Открыть папку" HorizontalAlignment="Right" Width="100" Click="btnOpenFolder_Click"/>
 
 

@@ -87,11 +87,14 @@ namespace FileTransmitter
                             prgAllFiles.Maximum = _countFilesForGet;
                             prgAllFiles.Value = 0;
                             prgAllFiles.Visibility = Visibility.Visible;
+                            lblAllFiles.Content = $"Получено файлов: {0} из {_countFilesForGet}.";
+
 
                             //блокируем перетаскивание Drag & Drop
-                            lbxMain.AllowDrop = false;
-                            lbxMain.Background = Brushes.Red;
-                            WinMain.Title = "Получение данных";
+                            lblMain.Content = "Идет получение файлов";
+                            lblMain.AllowDrop = false;
+                            lblMain.Background = Brushes.Lavender;
+                            //WinMain.Title = "Получение данных";
                         };
                         Dispatcher.Invoke(action);
                         break;
@@ -100,9 +103,10 @@ namespace FileTransmitter
                         Action action2 = () =>
                         {
                             //Разблокируем перетаскивание Drag & Drop
-                            lbxMain.AllowDrop = true;
-                            lbxMain.Background = Brushes.Ivory;
-                            WinMain.Title = $"Все данные получены. Ошибок: {_errorDataGet}";
+                            lblMain.Content = "Тащи сюда свои файлы";
+                            lblMain.AllowDrop = true;
+                            lblMain.Background = Brushes.Ivory;
+                            //WinMain.Title = $"Все данные получены. Ошибок: {_errorDataGet}";
 
                             prgAllFiles.Visibility = Visibility.Hidden;
                         };
@@ -122,9 +126,12 @@ namespace FileTransmitter
                         {
                             Action action147 = () =>
                             {
-                                lbxMain.AllowDrop = true;
-                                lbxMain.Background = Brushes.Ivory;
-                                WinMain.Title = $"Все данные отправлены, Ошибок: {_errorDataSet}";
+                                lblMain.Content = "Тащи сюда свои файлы";
+                                lblMain.AllowDrop = true;
+                                lblMain.Background = Brushes.Ivory;
+                                //WinMain.Title = $"Все данные отправлены, Ошибок: {_errorDataSet}";
+                                prgFile.Visibility = Visibility.Hidden;
+                                prgAllFiles.Visibility = Visibility.Hidden;
                             };
                             Dispatcher.Invoke(action147);
 
@@ -146,12 +153,28 @@ namespace FileTransmitter
                     case "FILEZERO":
                         fileName = dataInfo[1];
 
+                        //прогресс-бар
+                        Dispatcher.Invoke(() =>
+                        {
+                            prgFile.Minimum = 0;
+                            prgFile.Maximum = 1;
+                            prgFile.Visibility = Visibility.Visible;
+                        });
+
                         try
                         {
                             //создаем файл на диске
                             using FileStream fs = File.Create(config.DirectoryForSave + @"\" + fileName);
 
-                            Dispatcher.Invoke(() => WinMain.Title = fileName);
+                            _countFilesForGet--;
+                            Dispatcher.Invoke(() =>
+                            {
+                                lblFile.Content = fileName;
+                                prgFile.Visibility = Visibility.Hidden;//прогресс-бар
+                                prgAllFiles.Value++;
+                                lblAllFiles.Content = $"Получено файлов: {prgAllFiles.Value} из {prgAllFiles.Maximum}.";
+                            });
+                            
                         }
                         catch (Exception ex)
                         {
@@ -219,11 +242,14 @@ namespace FileTransmitter
                             //закрываем поток записи и высвобождаем его память
                             binaryWriter.Close();
 
-                            
+                            _countFilesForGet--;                            
                             Dispatcher.Invoke(() =>
                             {
-                                WinMain.Title = fileName;
+                                
+                                lblFile.Content = fileName;
                                 prgFile.Visibility = Visibility.Hidden;//прогресс-бар
+                                prgAllFiles.Value++;
+                                lblAllFiles.Content = $"Получено файлов: {prgAllFiles.Value} из {prgAllFiles.Maximum}.";
                             });
                         }
                         catch (Exception ex)
@@ -245,9 +271,6 @@ namespace FileTransmitter
                         await _socket.SendAsync(Encoding.UTF8.GetBytes("ERROR|0|0*"), SocketFlags.None);
                         break;
                 }
-
-                _countFilesForGet--;
-                Dispatcher.Invoke(()=>prgAllFiles.Value++);
 
                 //очищаем буферы
                 data.Clear();
