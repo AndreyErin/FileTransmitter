@@ -48,6 +48,7 @@ namespace FileTransmitter
                         //прогресс бар
                         Dispatcher.Invoke(() =>
                         {
+                            lblFile.Content = fileNameStruct.NameShort;
                             prgFile.Maximum = 1;
                             prgFile.Value = 1; ;
                         });
@@ -74,6 +75,7 @@ namespace FileTransmitter
                             //прогресс бар
                             Dispatcher.Invoke(() =>
                             {
+                                lblFile.Content = fileNameStruct.NameShort;
                                 prgFile.Maximum = binaryReader.BaseStream.Length;
                                 prgFile.Value = 0;
                             });
@@ -98,7 +100,7 @@ namespace FileTransmitter
 
                     Dispatcher.Invoke(() =>
                     {
-                        lblFile.Content = fileNameStruct.NameShort;
+                        //lblFile.Content = fileNameStruct.NameShort;
                         lblAllFiles.Content = $"Отправлено файлов: {++prgAllFiles.Value} из {prgAllFiles.Maximum}.";
                     });
                 }

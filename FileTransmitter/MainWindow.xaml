@@ -4,8 +4,8 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:FileTransmitter"
-        mc:Ignorable="d"
-        Title="Передача файлов" x:Name="WinMain" Height="250" Width="500" Loaded="Window_Loaded" Unloaded="WinMain_Unloaded">
+        mc:Ignorable="d" MaxHeight="200" MinHeight="200" MaxWidth="500" MinWidth="500"
+        Title="Файловый переместитель 2023. Версия: 1.0.0" x:Name="WinMain" Height="200" Width="500" Loaded="Window_Loaded" Closed="WinMain_Closed" Closing="WinMain_Closing">
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="auto"/>
@@ -33,13 +33,16 @@
         <Label Grid.Row="1" x:Name="lblAllFiles" Content="Общий прогресс" Background="Lavender" BorderBrush="Brown" BorderThickness="1"/>
         <Label Grid.Row="2" x:Name="lblFile" Content="Отдельный файл" Background="Lavender" BorderBrush="Brown" BorderThickness="1"/>
 
-        
-        
-        <Label x:Name="lblMain" Grid.Row="3"  Background="MistyRose" Drop="lblMain_Drop" Content="Нет соединения" HorizontalContentAlignment="Center"  VerticalContentAlignment="Center"/>
-        <Button Grid.Row="3" x:Name="btnOpenFolder" Content="Открыть папку" HorizontalAlignment="Right" Width="100" Click="btnOpenFolder_Click"/>
 
-
-        <TextBox Grid.Row="4" x:Name="txtStat" VerticalScrollBarVisibility="Visible" HorizontalScrollBarVisibility="Visible" />
+        <Grid Grid.Row="3">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition/>
+                <ColumnDefinition Width="auto"/>
+            </Grid.ColumnDefinitions>
+            
+            <Label Grid.Column="0" x:Name="lblMain"  Background="MistyRose" Drop="lblMain_Drop" Content="Нет соединения" HorizontalContentAlignment="Center"  VerticalContentAlignment="Center"/>
+            <Button Grid.Column="1"  x:Name="btnOpenFolder" Content="Открыть папку" HorizontalAlignment="Right" Width="100" Click="btnOpenFolder_Click"/>
+        </Grid>
 
 
         <Grid  Grid.Row="5">

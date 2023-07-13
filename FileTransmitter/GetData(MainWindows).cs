@@ -14,6 +14,7 @@ namespace FileTransmitter
         //получение данных
         private async Task GetData()
         {
+            BinaryWriter binaryWriter = new BinaryWriter(Stream.Null);
             List<byte> data = new List<byte>();
             byte[] fileBody;
             byte[] oneChar = new byte[1];
@@ -156,6 +157,7 @@ namespace FileTransmitter
                         //прогресс-бар
                         Dispatcher.Invoke(() =>
                         {
+                            lblFile.Content = fileName;
                             prgFile.Minimum = 0;
                             prgFile.Maximum = 1;
                             prgFile.Visibility = Visibility.Visible;
@@ -208,6 +210,7 @@ namespace FileTransmitter
                             //прогресс-бар
                             Dispatcher.Invoke(() =>
                             {
+                                lblFile.Content = fileName;
                                 prgFile.Minimum = 0;
                                 prgFile.Maximum = fileLength;
                                 prgFile.Visibility = Visibility.Visible;
@@ -215,7 +218,7 @@ namespace FileTransmitter
 
 
                             FileInfo fileInfo = new FileInfo(config.DirectoryForSave + @"\" + fileName);
-                            BinaryWriter binaryWriter = new BinaryWriter(fileInfo.OpenWrite());
+                            binaryWriter = new BinaryWriter(fileInfo.OpenWrite());
 
                             //создаем буфер 2 MB
                             fileBody = new byte[2097152];
@@ -254,7 +257,12 @@ namespace FileTransmitter
                         }
                         catch (Exception ex)
                         {
-                            Dispatcher.Invoke(() => MessageBox.Show("Ошибка записи файла\n" + ex.Message));
+                            Dispatcher.Invoke(() => MessageBox.Show($"Ошибка записи файла\nФайл {fileName} не был полностью записан и будет удален\n" + ex.Message));
+
+                            //закрываем поток записи и высвобождаем его память
+                            binaryWriter.Close();
+                            //если произошла ошибка, то удаляем не полностью записанный файл
+                            File.Delete(_directory + "\\" + fileName);
 
                             _errorDataGet++;
                             await _socket.SendAsync(Encoding.UTF8.GetBytes("ERROR|0|0*"), SocketFlags.None);

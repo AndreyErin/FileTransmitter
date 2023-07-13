@@ -86,6 +86,7 @@ namespace FileTransmitter
         private void IconInTrey() 
         {
             notifyIcon = new WinForms.NotifyIcon() { Icon = new System.Drawing.Icon("app.ico")};
+            notifyIcon.Text = "Программа для передачи файлов";
             notifyIcon.Visible = true;
             notifyIcon.DoubleClick += NotifyIcon_DoubleClick;
         }
@@ -147,8 +148,6 @@ namespace FileTransmitter
                     break;
             }
 
-
-
             //если соединения нет
             if (!connectTrue)
             {
@@ -189,6 +188,9 @@ namespace FileTransmitter
                             //запускаем прием данных, используем токен отмены
                             cts = new CancellationTokenSource();
                             token = cts.Token;
+
+
+                            //запускаем прием данных через токен
                             Task task = new Task(() => GetData(), token);
                             task.Start();
 
@@ -311,10 +313,9 @@ namespace FileTransmitter
             if (_socket == null) return;
 
 
-
             //запускаем прием данных через токен
-            Task task = new Task(()=> GetData(), token);
-                task.Start();
+            Task task = new Task(() => GetData(), token);
+            task.Start();
 
             //разрешаем перетаскивание
             lblMain.AllowDrop = true;
@@ -324,7 +325,6 @@ namespace FileTransmitter
             //если  подключение состоялось то запускаем таймер проверки соединения
             _timerCheckConnect.Start();  
         }
-
 
         //получаем имя файла при перетаскивание
         private async void lblMain_Drop(object sender, DragEventArgs e)
@@ -451,13 +451,6 @@ namespace FileTransmitter
             }
         }
 
-        private void WinMain_Unloaded(object sender, RoutedEventArgs e)
-        {
-            //сохранение конфигурации в файл
-            SaveConfig();
-            notifyIcon.Visible = false;
-        }
-
         private void btnOptionsIP_Click(object sender, RoutedEventArgs e)
         {
             switch (btnOptionsIP.Content)
@@ -527,6 +520,23 @@ namespace FileTransmitter
         private void btnOpenFolder_Click(object sender, RoutedEventArgs e)
         {
             System.Diagnostics.Process.Start( new System.Diagnostics.ProcessStartInfo(config.DirectoryForSave) { UseShellExecute = true});
+        }
+
+        private void WinMain_Closed(object sender, EventArgs e)
+        {
+            //сохранение конфигурации в файл
+            SaveConfig();
+            notifyIcon.Visible = false;
+            notifyIcon.Dispose();
+        }
+
+        private void WinMain_Closing(object sender, System.ComponentModel.CancelEventArgs e)
+        {
+            if (lblMain.Content.ToString() == "Идет передача файлов" || lblMain.Content.ToString() == "Идет получение файлов")
+            {
+                MessageBox.Show("Там файлы передаются, как-бэ!\nПодожди по братски.", "Ну вот надо оно тебе?", MessageBoxButton.OK, MessageBoxImage.Information);
+                e.Cancel = true;
+            }
         }
     }
 }
