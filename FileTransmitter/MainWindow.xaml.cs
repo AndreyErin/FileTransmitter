@@ -34,7 +34,7 @@ namespace FileTransmitter
         private string _ipForConnect = "";
         private int _port = 0;
 
-        System.Timers.Timer _timerCheckConnect = new System.Timers.Timer(1000);
+        System.Timers.Timer _timerCheckConnect = new System.Timers.Timer(500);
 
         private CancellationTokenSource cts;
         private CancellationToken token;
@@ -69,9 +69,7 @@ namespace FileTransmitter
             try
             {
                 //вынаем настройки из файла
-
                 config = JsonSerializer.Deserialize<Config>(File.ReadAllText("config.json"));
-
             }
             catch (Exception ex)
             {
@@ -144,11 +142,14 @@ namespace FileTransmitter
             //если соединения нет
             if (!connectTrue)
             {
-                //если программа запущенна в режиме сервера то останавливаем сервер
+                //если программа запущенна в режиме сервера то
                 if (_serverOn)
                 {
-                    Dispatcher.Invoke(() => StopServer());
-
+                    Dispatcher.Invoke(() => 
+                    { 
+                        StopServer();           //останавливаем сервер
+                        StartServerMode();      //запускаем сервер
+                    });
                 }
                 //если в режиме клиента то останавливаем клиент
                 else
@@ -219,15 +220,8 @@ namespace FileTransmitter
             switch (btnStartServer.Content)
             {
                 case "Запустить сервер":
-                    _serverOn = true;
                     StartServerMode();
 
-                    //выключаем кнопку клиента
-                    btnConnect.Visibility = Visibility.Hidden;
-
-                    btnStartServer.Content = "Остановить сервер";
-                    btnStartServer.Margin = new Thickness(1, 1, 1, 1);
-                    btnStartServer.Background = Brushes.Yellow;
                     break;
 
                 case "Остановить сервер":
@@ -271,11 +265,19 @@ namespace FileTransmitter
             //если подключение клиента было
             if (_socket != null)
             {
-                //останавливаем функцию приема данных
-                cts.Cancel();
-                _socket.Shutdown(SocketShutdown.Both);
-                _socket.Close();
-                _socket.Dispose();
+                try
+                {
+                    //останавливаем функцию приема данных
+                    cts.Cancel();
+                    //_socket.Shutdown(SocketShutdown.Both);
+                    _socket.Close();
+                    _socket.Dispose();
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show("Ошибка при попытке остановки сервера\n" + ex.Message, "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+
             }
 
             //останавливаем сокет прослушки подключения клиентов
@@ -300,6 +302,15 @@ namespace FileTransmitter
         //запускаем прослушивание порта
         private async Task StartServerMode() 
         {
+            _serverOn = true;
+
+
+            //выключаем кнопку клиента
+            btnConnect.Visibility = Visibility.Hidden;
+
+            btnStartServer.Content = "Остановить сервер";
+            btnStartServer.Margin = new Thickness(1, 1, 1, 1);
+            btnStartServer.Background = Brushes.Yellow;
 
             //создаем токен отмены для функции приема данных
             cts = new CancellationTokenSource();
@@ -327,7 +338,8 @@ namespace FileTransmitter
             lblMain.Content = "Тащи сюда свои файлы";
 
             //если  подключение состоялось то запускаем таймер проверки соединения
-            _timerCheckConnect.Start();  
+            _timerCheckConnect.Start();
+
         }
 
         //получаем имя файла при перетаскивание
