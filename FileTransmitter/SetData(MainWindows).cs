@@ -33,15 +33,7 @@ namespace FileTransmitter
                 else
                 {
                     fileInfo = new FileInfo(fileNameStruct.NameFull);
-
-                    //Dispatcher.Invoke(() =>
-                    //{
-                    //    lblFile.Content = fileNameStruct.NameShort;
-                    //    lblAllFiles.Content = $"Отправлено файлов: {prgAllFiles.Value++} из {prgAllFiles.Minimum}.";
-                    //});
-
-                    
-
+                   
                     //если файл пустой
                     if (fileInfo.Length == 0)
                     {                        
@@ -100,7 +92,6 @@ namespace FileTransmitter
 
                     Dispatcher.Invoke(() =>
                     {
-                        //lblFile.Content = fileNameStruct.NameShort;
                         lblAllFiles.Content = $"Отправлено файлов: {++prgAllFiles.Value} из {prgAllFiles.Maximum}.";
                     });
                 }
@@ -108,7 +99,14 @@ namespace FileTransmitter
             }
             catch (Exception ex)
             {
-                MessageBox.Show("отправка данных - файлы\n" + ex.Message);
+                Dispatcher.Invoke(() =>
+                {
+                    MessageBox.Show("отправка данных - файлы\n" + ex.Message);
+                    prgAllFiles.Visibility = Visibility.Hidden;
+                    prgFile.Visibility = Visibility.Hidden;
+                    lblAllFiles.Content = "Фокус не удался.";
+                    lblFile.Content = "В следующий раз точно повезет!";
+                });
             }
         }
 

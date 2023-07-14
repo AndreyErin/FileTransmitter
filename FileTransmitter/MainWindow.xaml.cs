@@ -163,8 +163,8 @@ namespace FileTransmitter
                     Dispatcher.Invoke(() => StopClient());
                 }
 
-                MessageBox.Show("Соединение кудат ушол");
-                //соединение разорвано
+                //MessageBox.Show("Соединение кудат ушол");
+                ////соединение разорвано
             }
         }
 

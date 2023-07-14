@@ -181,6 +181,8 @@ namespace FileTransmitter
                         catch (Exception ex)
                         {
                             MessageBox.Show("Ошибка записи пустого файла" + ex.Message);
+                            prgAllFiles.Visibility = Visibility.Hidden;
+                            prgFile.Visibility = Visibility.Hidden;
                         }
 
                         //отправляем сообщение о том, что очередной файл принят и обработан
@@ -257,7 +259,14 @@ namespace FileTransmitter
                         }
                         catch (Exception ex)
                         {
-                            Dispatcher.Invoke(() => MessageBox.Show($"Ошибка записи файла\nФайл {fileName} не был полностью записан и будет удален\n" + ex.Message));
+                            Dispatcher.Invoke(() =>
+                            {
+                                MessageBox.Show($"Ошибка записи файла\nФайл {fileName} не был полностью записан и будет удален\n" + ex.Message);
+                                prgAllFiles.Visibility = Visibility.Hidden;
+                                prgFile.Visibility = Visibility.Hidden;
+                                lblAllFiles.Content = "Фокус не удался.";
+                                lblFile.Content = "В следующий раз точно повезет!";
+                            });
 
                             //закрываем поток записи и высвобождаем его память
                             binaryWriter.Close();
