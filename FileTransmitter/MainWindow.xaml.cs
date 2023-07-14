@@ -34,7 +34,7 @@ namespace FileTransmitter
         private string _ipForConnect = "";
         private int _port = 0;
 
-        System.Timers.Timer _timerCheckConnect = new System.Timers.Timer(500);
+        System.Timers.Timer _timerCheckConnect = new System.Timers.Timer(2000);
 
         private CancellationTokenSource cts;
         private CancellationToken token;
@@ -58,15 +58,13 @@ namespace FileTransmitter
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
             //запрет запуска 2го экземпляра приложения
-            mutex = new Mutex(false, "Global\\" + appGuid);            
-                if (!mutex.WaitOne(0, false))
-                {
+            mutex = new Mutex(false, "Global\\" + appGuid);
+            if (!mutex.WaitOne(0, false))
+            {
                 WinMain.Visibility = Visibility.Hidden;
-                    MessageBox.Show("Приложение уже запущено.");
-                    WinMain.Close();
-                }
-            
-
+                MessageBox.Show("Приложение уже запущено.", "Уведомление", MessageBoxButton.OK, MessageBoxImage.Information);
+                WinMain.Close();
+            }
 
             try
             {
@@ -124,7 +122,6 @@ namespace FileTransmitter
         //таймер проверяет есть ли соединение (не отвалилась ли программа на том конце)
         private void _timerCheckConnect_Elapsed(object? sender, ElapsedEventArgs e)
         {
-
             bool connectTrue = false;
 
             IPGlobalProperties iPGlobalProperties = IPGlobalProperties.GetIPGlobalProperties();
@@ -145,7 +142,6 @@ namespace FileTransmitter
                             connectTrue = true;
                         }
                     }
-
                     break;
 
                 case false:
@@ -160,7 +156,6 @@ namespace FileTransmitter
                             connectTrue = true;
                         }
                     }
-
                     break;
             }
 
@@ -178,9 +173,6 @@ namespace FileTransmitter
                 {
                     Dispatcher.Invoke(() => StopClient());
                 }
-
-                //MessageBox.Show("Соединение кудат ушол");
-                ////соединение разорвано
             }
         }
 
@@ -205,17 +197,17 @@ namespace FileTransmitter
                             cts = new CancellationTokenSource();
                             token = cts.Token;
 
-
                             //запускаем прием данных через токен
                             Task task = new Task(() => GetData(), token);
                             task.Start();
-
 
                             //разрешаем перетаскивание
                             lblMain.AllowDrop = true;
                             lblMain.Background = Brushes.Ivory;
                             lblMain.Content = "Тащи сюда свои файлы";
                             btnConnect.Content = "Отключиться от сервера";
+                            btnConnect.Margin = new Thickness(1,1,1,1);
+                            btnConnect.Background = Brushes.GreenYellow;
                             //выключаем кнопку сервера
                             btnStartServer.Visibility = Visibility.Hidden;
 
@@ -224,7 +216,7 @@ namespace FileTransmitter
                     }
                     catch (Exception ex)
                     {
-                        MessageBox.Show("Не удалось подключиться к серверу.\n" + ex.Message);
+                        MessageBox.Show("Не удалось подключиться к серверу.\n" + ex.Message, "Уведомление", MessageBoxButton.OK, MessageBoxImage.Information);
                     }
                     break;
 
@@ -247,8 +239,8 @@ namespace FileTransmitter
                     btnConnect.Visibility = Visibility.Hidden;
 
                     btnStartServer.Content = "Остановить сервер";
-                    
-                   
+                    btnStartServer.Margin = new Thickness(1, 1, 1, 1);
+                    btnStartServer.Background = Brushes.Yellow;
                     break;
 
                 case "Остановить сервер":
@@ -276,6 +268,8 @@ namespace FileTransmitter
             lblMain.Background = Brushes.MistyRose;
             lblMain.Content = "Нет соединения";
             btnConnect.Content = "Подключиться к серверу";
+            btnConnect.Margin = new Thickness(1, 1, 235, 1);
+            btnConnect.Background = Brushes.SeaShell;
         }
 
         private void StopServer() 
@@ -306,6 +300,8 @@ namespace FileTransmitter
             btnConnect.Visibility = Visibility.Visible;
 
             btnStartServer.Content = "Запустить сервер";
+            btnStartServer.Margin = new Thickness(250, 1, 1, 1);
+            btnStartServer.Background = Brushes.SeaShell;
             _serverOn = false;
         }
 
@@ -463,7 +459,7 @@ namespace FileTransmitter
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Подготовка списка файлов\n" + ex.Message);
+                MessageBox.Show("Подготовка списка файлов\n" + ex.Message, "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -535,6 +531,10 @@ namespace FileTransmitter
 
         private void btnOpenFolder_Click(object sender, RoutedEventArgs e)
         {
+            //если папки для сохранения не существует, то создаем ее
+            if (!Directory.Exists(config.DirectoryForSave))
+                Directory.CreateDirectory(config.DirectoryForSave);
+
             System.Diagnostics.Process.Start( new System.Diagnostics.ProcessStartInfo(config.DirectoryForSave) { UseShellExecute = true});
         }
 

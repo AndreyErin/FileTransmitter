@@ -28,7 +28,7 @@ namespace FileTransmitter
 
                 if (fileNameStruct.NameShort.Contains('|') || fileNameStruct.NameShort.Contains('*'))
                 {
-                    MessageBox.Show("Имя файла {0} содержит некорректные символы (| или *)\nКопирование не возможно. Файл будет пропущен.", fileNameStruct.NameShort);
+                    MessageBox.Show($"Имя файла {fileNameStruct.NameShort} содержит некорректные символы (| или *)\nКопирование не возможно. Файл будет пропущен.", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
                 }
                 else
                 {
@@ -101,7 +101,7 @@ namespace FileTransmitter
             {
                 Dispatcher.Invoke(() =>
                 {
-                    MessageBox.Show("отправка данных - файлы\n" + ex.Message);
+                    MessageBox.Show("отправка данных - файлы\n" + ex.Message, "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
                     prgAllFiles.Visibility = Visibility.Hidden;
                     prgFile.Visibility = Visibility.Hidden;
                     lblAllFiles.Content = "Фокус не удался.";
@@ -121,7 +121,7 @@ namespace FileTransmitter
                 {
                     if (dirName.NameShort.Contains('|') || dirName.NameShort.Contains('*'))
                     {
-                        MessageBox.Show("Имя папки {0} содержит некорректные символы (| или *)\nКопирование не возможно. Папка будет пропущена.", dirName.NameShort);
+                        MessageBox.Show($"Имя папки {dirName.NameShort} содержит некорректные символы (| или *)\nКопирование не возможно. Папка будет пропущена.", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
                     }
                     else
                     {
@@ -135,7 +135,7 @@ namespace FileTransmitter
             }
             catch (Exception ex)
             {
-                MessageBox.Show("отправка данных - папки\n" + ex.Message);
+                MessageBox.Show("отправка данных - папки\n" + ex.Message, "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 

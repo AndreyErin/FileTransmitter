@@ -184,7 +184,7 @@ namespace FileTransmitter
                         }
                         catch (Exception ex)
                         {
-                            MessageBox.Show("Ошибка записи пустого файла" + ex.Message);
+                            MessageBox.Show("Ошибка записи пустого файла" + ex.Message, "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
                             prgAllFiles.Visibility = Visibility.Hidden;
                             prgFile.Visibility = Visibility.Hidden;
                         }
@@ -265,7 +265,7 @@ namespace FileTransmitter
                         {
                             Dispatcher.Invoke(() =>
                             {
-                                MessageBox.Show($"Ошибка записи файла\nФайл {fileName} не был полностью записан и будет удален\n" + ex.Message);
+                                MessageBox.Show($"Ошибка записи файла\nФайл {fileName} не был полностью записан и будет удален\n" + ex.Message, "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
                                 prgAllFiles.Visibility = Visibility.Hidden;
                                 prgFile.Visibility = Visibility.Hidden;
                                 lblAllFiles.Content = "Фокус не удался.";

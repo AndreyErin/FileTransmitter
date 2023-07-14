@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:FileTransmitter"
         mc:Ignorable="d"  ResizeMode = "NoResize"
-        Title="Файловый переместитель 2023. Версия: 1.0.0" x:Name="WinMain" Height="200" Width="500" Loaded="Window_Loaded" Closed="WinMain_Closed" Closing="WinMain_Closing">
+        Title="Файловый передаватель 2023. Версия: 1.0.0" x:Name="WinMain" Height="200" Width="500" Loaded="Window_Loaded" Closed="WinMain_Closed" Closing="WinMain_Closing">
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="auto"/>
@@ -17,13 +17,13 @@
         </Grid.RowDefinitions>
 
         <Grid  Grid.Row="0">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition/>
-                <ColumnDefinition/>
-            </Grid.ColumnDefinitions>
+            <!--<Grid.ColumnDefinitions>
+                <ColumnDefinition />
+                <ColumnDefinition />
+            </Grid.ColumnDefinitions>-->
 
-            <Button Grid.Column="0" x:Name="btnConnect" Content="Подключиться к серверу" Click="btnConnect_Click"/>
-            <Button Grid.Column="1" x:Name="btnStartServer" Content="Запустить сервер" Click="btnStartServer_Click" />
+            <Button x:Name="btnConnect" Content="Подключиться к серверу" Margin="1,1,235,1" Background="SeaShell" Click="btnConnect_Click"/>
+            <Button x:Name="btnStartServer" Content="Запустить сервер" Margin="250,1,1,1" Background="SeaShell" Click="btnStartServer_Click" />
         </Grid>
 
 
@@ -41,7 +41,7 @@
             </Grid.ColumnDefinitions>
             
             <Label Grid.Column="0" x:Name="lblMain"  Background="MistyRose" Drop="lblMain_Drop" Content="Нет соединения" HorizontalContentAlignment="Center"  VerticalContentAlignment="Center"/>
-            <Button Grid.Column="1"  x:Name="btnOpenFolder" Content="Открыть папку" HorizontalAlignment="Right" Width="100" Click="btnOpenFolder_Click"/>
+            <Button Grid.Column="1"  x:Name="btnOpenFolder" Content="Открыть папку" HorizontalAlignment="Right" Background="SeaShell" Width="100" Click="btnOpenFolder_Click"/>
         </Grid>
 
 
@@ -56,12 +56,12 @@
             </Grid.ColumnDefinitions>
 
 
-            <Button Grid.Column="0" x:Name="btnOptionsIP" Content="Адрес сервера" Click="btnOptionsIP_Click"/>
+            <Button Grid.Column="0" x:Name="btnOptionsIP" Content="Адрес сервера" Background="SeaShell" Click="btnOptionsIP_Click"/>
             <TextBox Grid.Column="1" x:Name="txtIP" Text="192.168.0.34" IsEnabled="False"/>
-            <Button  Grid.Column="2" x:Name="btnOptionsPort"  Content="Порт" Click="btnOptionsPort_Click" />
+            <Button  Grid.Column="2" x:Name="btnOptionsPort" Content="Порт" Background="SeaShell" Click="btnOptionsPort_Click" />
 
             <TextBox Grid.Column="3" x:Name="txtPort" Text="7070" IsEnabled="False"/>
-            <Button Grid.Column="4" x:Name="btnOptionsDirectory" Content="Папка для сохранения принятых файлов" Click="btnOptionsDirectory_Click"/>
+            <Button Grid.Column="4" x:Name="btnOptionsDirectory" Content="Папка для сохранения принятых файлов" Background="SeaShell" Click="btnOptionsDirectory_Click"/>
 
         </Grid>
 
