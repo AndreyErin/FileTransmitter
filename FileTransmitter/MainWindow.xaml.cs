@@ -34,7 +34,7 @@ namespace FileTransmitter
         private string _ipForConnect = "";
         private int _port = 0;
 
-        System.Timers.Timer _timerCheckConnect = new System.Timers.Timer(2000);
+        System.Timers.Timer _timerCheckConnect = new System.Timers.Timer(1000);
 
         private CancellationTokenSource cts;
         private CancellationToken token;
@@ -91,6 +91,9 @@ namespace FileTransmitter
             _port = config.Port;
             _directory = config.DirectoryForSave;
 
+            txtIP.Text = _ipForConnect;
+            txtPort.Text = _port.ToString();
+
             IconInTrey();
 
             _timerCheckConnect.Elapsed += _timerCheckConnect_Elapsed;
@@ -126,37 +129,16 @@ namespace FileTransmitter
 
             IPGlobalProperties iPGlobalProperties = IPGlobalProperties.GetIPGlobalProperties();
             TcpConnectionInformation[] tcpConnectionInformation = iPGlobalProperties.GetActiveTcpConnections();
-            //StringBuilder stringBuilder = new StringBuilder();
 
-            switch (_serverOn)
+            foreach (TcpConnectionInformation connect in tcpConnectionInformation)
             {
-                case true:
-
-                    foreach (TcpConnectionInformation connect in tcpConnectionInformation)
-                    {
-                        //если в списке активных подключений есть наше и оно активно, то значит все норм
-                        if (connect.RemoteEndPoint.Equals(_socket.RemoteEndPoint) &&
-                            connect.LocalEndPoint.Equals(_socket.LocalEndPoint))
-                        {
-                            //соединение есть
-                            connectTrue = true;
-                        }
-                    }
-                    break;
-
-                case false:
-
-                    foreach (TcpConnectionInformation connect in tcpConnectionInformation)
-                    {
-                        //если в списке активных подключений есть наше и оно активно, то значит все норм
-                        if (connect.RemoteEndPoint.Equals(_socket.LocalEndPoint) &&
-                            connect.LocalEndPoint.Equals(_socket.RemoteEndPoint))
-                        {
-                            //соединение есть
-                            connectTrue = true;
-                        }
-                    }
-                    break;
+                //если в списке активных подключений есть наше и оно активно, то значит все норм
+                if (connect.RemoteEndPoint.Equals(_socket.RemoteEndPoint) &&
+                     connect.LocalEndPoint.Equals(_socket.LocalEndPoint))
+                {
+                    //соединение есть
+                    connectTrue = true;
+                }
             }
 
             //если соединения нет
@@ -221,6 +203,11 @@ namespace FileTransmitter
                     break;
 
                 case "Отключиться от сервера":
+                    if (lblMain.Content.ToString() == "Идет передача файлов" || lblMain.Content.ToString() == "Идет получение файлов")
+                    {
+                        MessageBox.Show("Там файлы передаются, как-бэ!\nПодожди по братски.", "Ну вот надо оно тебе?", MessageBoxButton.OK, MessageBoxImage.Information);
+                        return;
+                    }
                     StopClient();
                     break;
             }
@@ -244,6 +231,11 @@ namespace FileTransmitter
                     break;
 
                 case "Остановить сервер":
+                    if (lblMain.Content.ToString() == "Идет передача файлов" || lblMain.Content.ToString() == "Идет получение файлов")
+                    {
+                        MessageBox.Show("Там файлы передаются, как-бэ!\nПодожди по братски.", "Ну вот надо оно тебе?", MessageBoxButton.OK, MessageBoxImage.Information);
+                        return;
+                    }
                     StopServer();
                     break;
             }
@@ -538,6 +530,7 @@ namespace FileTransmitter
             System.Diagnostics.Process.Start( new System.Diagnostics.ProcessStartInfo(config.DirectoryForSave) { UseShellExecute = true});
         }
 
+        //прям закрытие-закрытие)
         private void WinMain_Closed(object sender, EventArgs e)
         {
             //сохранение конфигурации в файл
@@ -547,11 +540,13 @@ namespace FileTransmitter
             mutex.Dispose();
         }
 
+        //перед закрытием
         private void WinMain_Closing(object sender, System.ComponentModel.CancelEventArgs e)
         {
             if (lblMain.Content.ToString() == "Идет передача файлов" || lblMain.Content.ToString() == "Идет получение файлов")
             {
-                MessageBox.Show("Там файлы передаются, как-бэ!\nПодожди по братски.", "Ну вот надо оно тебе?", MessageBoxButton.OK, MessageBoxImage.Information);
+                WinMain.Visibility = Visibility.Hidden;
+                //MessageBox.Show("Там файлы передаются, как-бэ!\nПодожди по братски.", "Ну вот надо оно тебе?", MessageBoxButton.OK, MessageBoxImage.Information);
                 e.Cancel = true;
             }
         }

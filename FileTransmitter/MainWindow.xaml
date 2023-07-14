@@ -57,10 +57,10 @@
 
 
             <Button Grid.Column="0" x:Name="btnOptionsIP" Content="Адрес сервера" Background="SeaShell" Click="btnOptionsIP_Click"/>
-            <TextBox Grid.Column="1" x:Name="txtIP" Text="192.168.0.34" IsEnabled="False"/>
+            <TextBox Grid.Column="1" x:Name="txtIP" IsEnabled="False"/>
             <Button  Grid.Column="2" x:Name="btnOptionsPort" Content="Порт" Background="SeaShell" Click="btnOptionsPort_Click" />
 
-            <TextBox Grid.Column="3" x:Name="txtPort" Text="7070" IsEnabled="False"/>
+            <TextBox Grid.Column="3" x:Name="txtPort" IsEnabled="False"/>
             <Button Grid.Column="4" x:Name="btnOptionsDirectory" Content="Папка для сохранения принятых файлов" Background="SeaShell" Click="btnOptionsDirectory_Click"/>
 
         </Grid>
