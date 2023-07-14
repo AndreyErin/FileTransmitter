@@ -4,7 +4,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:FileTransmitter"
-        mc:Ignorable="d" MaxHeight="200" MinHeight="200" MaxWidth="500" MinWidth="500"
+        mc:Ignorable="d"  ResizeMode = "NoResize"
         Title="Файловый переместитель 2023. Версия: 1.0.0" x:Name="WinMain" Height="200" Width="500" Loaded="Window_Loaded" Closed="WinMain_Closed" Closing="WinMain_Closing">
     <Grid>
         <Grid.RowDefinitions>

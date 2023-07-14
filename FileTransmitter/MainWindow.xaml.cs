@@ -21,6 +21,11 @@ namespace FileTransmitter
     /// </summary>
     public partial class MainWindow : Window
     {
+        Mutex mutex;
+        //ключ для мьютикса(случайные символы)
+        private static string appGuid = "cfffff-ffff-45c5-aaaa-d693faa6e7b9";
+
+
         WinForms.NotifyIcon notifyIcon;
 
         private Config? config = new Config();
@@ -52,6 +57,17 @@ namespace FileTransmitter
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
+            //запрет запуска 2го экземпляра приложения
+            mutex = new Mutex(false, "Global\\" + appGuid);            
+                if (!mutex.WaitOne(0, false))
+                {
+                WinMain.Visibility = Visibility.Hidden;
+                    MessageBox.Show("Приложение уже запущено.");
+                    WinMain.Close();
+                }
+            
+
+
             try
             {
                 //вынаем настройки из файла
@@ -528,6 +544,7 @@ namespace FileTransmitter
             SaveConfig();
             notifyIcon.Visible = false;
             notifyIcon.Dispose();
+            mutex.Dispose();
         }
 
         private void WinMain_Closing(object sender, System.ComponentModel.CancelEventArgs e)
