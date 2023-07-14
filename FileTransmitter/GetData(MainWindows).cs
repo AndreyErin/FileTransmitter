@@ -33,6 +33,9 @@ namespace FileTransmitter
                 stopGetData = true;
             });
 
+            //если папки для сохранения не существует, то создаем ее
+            if (!Directory.Exists(config.DirectoryForSave))
+                Directory.CreateDirectory(config.DirectoryForSave);
 
             while (true)
             {
@@ -69,6 +72,7 @@ namespace FileTransmitter
                 switch (dataInfo[0])
                 {
                     case "DIRS":
+
                         //создаем все папки
                         for (int i = 1; i < dataInfo.Length; i++)
                         {
