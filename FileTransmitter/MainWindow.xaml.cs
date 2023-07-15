@@ -40,7 +40,7 @@ namespace FileTransmitter
         private CancellationToken token;
 
         private List<PathNames> allFiles = new List<PathNames>();
-        private Socket _socket;
+        private Socket? _socket;
         private Socket _socketServerListener;
         private bool _serverOn = false;
         private int _countFilesForGet = 0;//подсчет файлов которые надо принять в принимающей программе
@@ -269,9 +269,10 @@ namespace FileTransmitter
                 {
                     //останавливаем функцию приема данных
                     cts.Cancel();
-                    //_socket.Shutdown(SocketShutdown.Both);
+                    _socket.Shutdown(SocketShutdown.Both);
                     _socket.Close();
                     _socket.Dispose();
+                    _socket = null;
                 }
                 catch (Exception ex)
                 {
